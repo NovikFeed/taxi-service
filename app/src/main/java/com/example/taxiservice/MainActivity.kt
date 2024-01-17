@@ -5,13 +5,12 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import androidx.appcompat.app.AppCompatDelegate
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        val intent = Intent(this, LoginActivity::class.java)
+        val intent = Intent(this, ChoiceActionActivity::class.java)
         Handler(Looper.getMainLooper()).postDelayed({
             startActivity(intent)
             finish()
