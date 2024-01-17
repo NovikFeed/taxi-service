@@ -3,7 +3,6 @@
     <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <!-- Властивість, що вказує на використання світлої теми -->
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:forceDarkAllowed">false</item>
 
     </style>
 </resources>
