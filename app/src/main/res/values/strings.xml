@@ -4,14 +4,14 @@
     <string name="login">Log in</string>
     <string name="action">Choose an action</string>
     <string name="name">Name</string>
-    <string name="lastname">LastName</string>
+    <string name="lastname">Email</string>
     <string name="phoneNumber">Phone number</string>
     <string name="pass">Password</string>
     <string name="passenger">Passenger</string>
     <string name="driver">Driver</string>
     <string name="hintName">enter your name</string>
-    <string name="hintLastName">enter your lastname</string>
+    <string name="hintLastName">enter your email</string>
     <string name="hintPhoneNumber">enter your phone number</string>
-    <string name="hintPassword">guess the password</string>
+    <string name="hintPassword">enter your password</string>
     <string name="chooseYou">Who are you?</string>
 </resources>
