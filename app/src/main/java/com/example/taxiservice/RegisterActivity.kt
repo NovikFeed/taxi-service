@@ -15,6 +15,7 @@ import android.widget.EditText
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
@@ -59,7 +60,7 @@ class RegisterActivity : AppCompatActivity() {
         userEmail = inputEmail.text.toString()
         userPhoneNumber = inputPhone.text.toString()
         userPassword = inputPassword.text.toString()
-        userChose = if(chooseWhoAreYou.isActivated){
+        userChose = if(chooseWhoAreYou.isChecked){
             "driver"
         } else{
             "passenger"
@@ -82,14 +83,14 @@ class RegisterActivity : AppCompatActivity() {
             setRedBorderForInputText(inputPassword)
             setVisibleErrorLengthPassword(textErrorLengthPassword)
         }
-        return (inputName.text.toString() != "")&&(inputEmail.text.toString() != "")&&(inputPhone.text.toString() != "")&&(inputPassword.text.toString() != "")&&(inputPassword.text.toString().length<6)
+        return (inputName.text.toString() != "")&&(inputEmail.text.toString() != "")&&(inputPhone.text.toString() != "")&&(inputPassword.text.toString() != "")&&(inputPassword.text.toString().length>=6)
     }
     fun setRedBorderForInputText(inputText:EditText){
         val style = inputText.background
         inputText.setBackgroundResource(R.drawable.red_border)
         android.os.Handler(Looper.getMainLooper()).postDelayed({
             inputText.background = style
-        },1000)
+        },3000)
     }
 
     fun registerAction(view: View) {
@@ -97,9 +98,7 @@ class RegisterActivity : AppCompatActivity() {
             if(checkNotEmptyInput()){
                 getViewValues()
                 saveUser(userName,userEmail,userPhoneNumber,userPassword,userChose)
-                setActivityForIntent(userChose)
-                startActivity(intent)
-                finish()
+
 
             }
             else{
@@ -126,7 +125,9 @@ class RegisterActivity : AppCompatActivity() {
                         val userUid = it.uid
                         val firebaseUser = User(userName,userEmail,userPhone,userChose)
                         db.child("users").child(userUid).setValue(firebaseUser).addOnSuccessListener {
+
                             Toast.makeText(baseContext,"Account data saved successfully", Toast.LENGTH_SHORT).show()
+                            nextActivity()
                         }.addOnFailureListener { e ->
                             Log.e(TAG, "Error saving user data", e)}
                     resetInputText()
@@ -170,6 +171,12 @@ class RegisterActivity : AppCompatActivity() {
     private fun setVisibleErrorLengthPassword(textView: TextView){
         textView.visibility = View.VISIBLE
         android.os.Handler(Looper.getMainLooper()).postDelayed({textView.visibility = View.INVISIBLE},3000)
+    }
+    private fun nextActivity(){
+        setActivityForIntent(userChose)
+                startActivity(intent)
+                finish()
+
     }
 
 
