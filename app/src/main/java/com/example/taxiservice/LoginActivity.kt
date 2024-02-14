@@ -41,12 +41,7 @@ class LoginActivity : AppCompatActivity() {
         if(checkInternetConnect()){
             if(checkNotEmptyInput()){
                 getInputValue()
-                userChoose = loginInServer(userEmail,userPassword)
-
-//                setActivityForIntent(userChoose)
-//                startActivity(intent)
-//                finish()
-
+                loginInServer(userEmail,userPassword)
             }
             else{
                 Toast.makeText(this,"There are empty fields", Toast.LENGTH_SHORT).show()
@@ -87,22 +82,23 @@ class LoginActivity : AppCompatActivity() {
         userEmail = inputEmail.text.toString()
         userPassword = inputPassword.text.toString()
     }
-    fun loginInServer(userEmail : String, userPassword : String):String{
+    fun loginInServer(userEmail : String, userPassword : String){
         var userChooseInFun = ""
-        val db = Firebase.database.reference
         auth = Firebase.auth
         auth.signInWithEmailAndPassword(userEmail, userPassword).addOnCompleteListener(this) {task ->
             if(task.isSuccessful){
                val user = auth.currentUser
+                val db = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference
                 user?.let {
                     db.child("users").child(user.uid).addListenerForSingleValueEvent(object : ValueEventListener{
                         override fun onDataChange(snapshot: DataSnapshot) {
-                            Toast.makeText(baseContext, "Снапшот існує", Toast.LENGTH_SHORT).show()
                             if(snapshot.exists()){
-                                val userData = snapshot.getValue<Map<String,Any>>()
+                                val userData = snapshot.getValue<User>()
                                 userData?.let{
-                                    userChooseInFun = it["choose"] as String
-                                    Toast.makeText(baseContext, userChooseInFun, Toast.LENGTH_SHORT).show()
+                                    userChooseInFun = userData.getChoose()
+                                    setActivityForIntent(userChooseInFun)
+                                    startActivity(intent)
+                                    finish()
 
                                 }
                             }
@@ -110,6 +106,7 @@ class LoginActivity : AppCompatActivity() {
                                 Toast.makeText(baseContext, "Read data failed1", Toast.LENGTH_SHORT).show()
                             }
                         }
+
 
                         override fun onCancelled(error: DatabaseError) {
                             Toast.makeText(baseContext, "Read data failed", Toast.LENGTH_SHORT).show()
@@ -120,7 +117,7 @@ class LoginActivity : AppCompatActivity() {
             }
             else{Toast.makeText(baseContext, "Authentication failed", Toast.LENGTH_SHORT).show()}
         }
-        return userChooseInFun
+
     }
     private fun setActivityForIntent(choose : String){
         if(choose == "driver"){
