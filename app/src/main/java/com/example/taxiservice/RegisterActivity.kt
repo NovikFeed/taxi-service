@@ -1,5 +1,6 @@
 package com.example.taxiservice
 
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -12,11 +13,12 @@ import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.Switch
+import android.widget.TextView
 import android.widget.Toast
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 import java.util.logging.Handler
 
@@ -28,6 +30,7 @@ class RegisterActivity : AppCompatActivity() {
     private lateinit var inputPassword : EditText
     private lateinit var chooseWhoAreYou : Switch
     private lateinit var buttonRegister : Button
+    private lateinit var textErrorLengthPassword : TextView
     //part data var
     private lateinit var userName :String
     private lateinit var userEmail:String
@@ -49,6 +52,7 @@ class RegisterActivity : AppCompatActivity() {
         inputPassword = findViewById(R.id.inputPassword)
         chooseWhoAreYou = findViewById(R.id.choiceWho)
         buttonRegister = findViewById(R.id.regButton)
+        textErrorLengthPassword = findViewById(R.id.errorLengthPass)
     }
     fun getViewValues(){
         userName = inputName.text.toString()
@@ -74,7 +78,11 @@ class RegisterActivity : AppCompatActivity() {
         if(inputPassword.text.toString() == ""){
             setRedBorderForInputText(inputPassword)
         }
-        return (inputName.text.toString() != "")&&(inputEmail.text.toString() != "")&&(inputPhone.text.toString() != "")&&(inputPassword.text.toString() != "")
+        if(inputPassword.text.toString().length<6){
+            setRedBorderForInputText(inputPassword)
+            setVisibleErrorLengthPassword(textErrorLengthPassword)
+        }
+        return (inputName.text.toString() != "")&&(inputEmail.text.toString() != "")&&(inputPhone.text.toString() != "")&&(inputPassword.text.toString() != "")&&(inputPassword.text.toString().length<6)
     }
     fun setRedBorderForInputText(inputText:EditText){
         val style = inputText.background
@@ -112,24 +120,21 @@ class RegisterActivity : AppCompatActivity() {
         if(!checkInBase(userEmail)){
             auth.createUserWithEmailAndPassword(userEmail,userPassword).addOnCompleteListener(this) { task ->
                 if(task.isSuccessful){
-                    val user = auth.currentUser
-                    val dataBase = FirebaseFirestore.getInstance()
-                    val userDocument = dataBase.collection("user").document(user?.uid ?: "")
-                    val userData = hashMapOf(
-                        "name" to userName,
-                        "password" to userPassword,
-                        "choose" to userChose
-                    )
-                    userDocument.set(userData).addOnSuccessListener {
-                        Toast.makeText(this,"Account data saved successfully", Toast.LENGTH_SHORT).show()
-                    }.addOnFailureListener { e ->
-                        Toast.makeText(this,"Account data saved falled", Toast.LENGTH_SHORT).show()}
-                    Toast.makeText(this,"Account registered successfully", Toast.LENGTH_SHORT).show()
+                    val db = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference
+                    val user = FirebaseAuth.getInstance().currentUser
+                    user?.let{
+                        val userUid = it.uid
+                        val firebaseUser = User(userName,userEmail,userPhone,userChose)
+                        db.child("users").child(userUid).setValue(firebaseUser).addOnSuccessListener {
+                            Toast.makeText(baseContext,"Account data saved successfully", Toast.LENGTH_SHORT).show()
+                        }.addOnFailureListener { e ->
+                            Log.e(TAG, "Error saving user data", e)}
                     resetInputText()
-
+                    }
                 }
                 else{
                     Toast.makeText(baseContext, "Authentication failed: ${task.exception?.message}", Toast.LENGTH_SHORT).show()
+
                 }
             }
         }
@@ -162,6 +167,10 @@ class RegisterActivity : AppCompatActivity() {
         }
     }
 
+    private fun setVisibleErrorLengthPassword(textView: TextView){
+        textView.visibility = View.VISIBLE
+        android.os.Handler(Looper.getMainLooper()).postDelayed({textView.visibility = View.INVISIBLE},3000)
+    }
 
 
 }

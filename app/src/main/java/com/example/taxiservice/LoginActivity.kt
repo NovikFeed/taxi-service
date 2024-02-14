@@ -16,7 +16,8 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
-import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.database.getValue
+import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 
 class LoginActivity : AppCompatActivity() {
@@ -88,40 +89,33 @@ class LoginActivity : AppCompatActivity() {
     }
     fun loginInServer(userEmail : String, userPassword : String):String{
         var userChooseInFun = ""
-        val db = FirebaseFirestore.getInstance()
+        val db = Firebase.database.reference
         auth = Firebase.auth
         auth.signInWithEmailAndPassword(userEmail, userPassword).addOnCompleteListener(this) {task ->
             if(task.isSuccessful){
-//                val user = auth.currentUser
-//                val database = FirebaseDatabase.getInstance()
-//                val userRef = database.reference.child("users").child(user?.uid ?: "")
-//                userRef.addListenerForSingleValueEvent(object : ValueEventListener {
-//                    override fun onDataChange(snapshot: DataSnapshot) {
-//                        if(snapshot.exists()){
-//                            val tmp = snapshot.child("choose").getValue(String::class.java)
-//                            if(tmp != null){
-//                                userChoose = tmp
-//                            }
-//                        }
-//                    }
-//
-//                    override fun onCancelled(error: DatabaseError) {
-//                        TODO("Not yet implemented")
-//                    }
-//                })
-                val userId = FirebaseAuth.getInstance().currentUser?.uid
-                if(userId != null) {
-                    db.collection("users").document(userId)
-                        .get()
-                        .addOnSuccessListener { document ->
-                            if(document.exists()){
-                              val tmp = document.getString("choose")
-                                if(tmp != null){
-                                    userChooseInFun = tmp
-                                    Toast.makeText(this, tmp, Toast.LENGTH_SHORT).show()
+               val user = auth.currentUser
+                user?.let {
+                    db.child("users").child(user.uid).addListenerForSingleValueEvent(object : ValueEventListener{
+                        override fun onDataChange(snapshot: DataSnapshot) {
+                            Toast.makeText(baseContext, "Снапшот існує", Toast.LENGTH_SHORT).show()
+                            if(snapshot.exists()){
+                                val userData = snapshot.getValue<Map<String,Any>>()
+                                userData?.let{
+                                    userChooseInFun = it["choose"] as String
+                                    Toast.makeText(baseContext, userChooseInFun, Toast.LENGTH_SHORT).show()
+
                                 }
                             }
+                            else{
+                                Toast.makeText(baseContext, "Read data failed1", Toast.LENGTH_SHORT).show()
+                            }
                         }
+
+                        override fun onCancelled(error: DatabaseError) {
+                            Toast.makeText(baseContext, "Read data failed", Toast.LENGTH_SHORT).show()
+                        }
+
+                    })
                 }
             }
             else{Toast.makeText(baseContext, "Authentication failed", Toast.LENGTH_SHORT).show()}
@@ -134,6 +128,10 @@ class LoginActivity : AppCompatActivity() {
         }
         else if(choose == "passenger"){
             intent = Intent(this, PassagerActivity::class.java)
+        }
+        else{
+            Toast.makeText(baseContext, "Opertunity failed", Toast.LENGTH_SHORT).show()
+            intent = Intent(this, this::class.java)
         }
     }
     }
