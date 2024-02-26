@@ -119,7 +119,7 @@ class LoginActivity : AppCompatActivity() {
         }
 
     }
-    private fun setActivityForIntent(choose : String){
+    fun setActivityForIntent(choose : String){
         if(choose == "driver"){
             intent = Intent(this, DriverActivity::class.java)
         }
