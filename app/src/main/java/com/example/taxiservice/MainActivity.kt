@@ -74,7 +74,7 @@ class MainActivity : AppCompatActivity() {
             intentForAutoAuth = Intent(this, DriverActivity::class.java)
         }
         else if(choose == "passenger"){
-            intentForAutoAuth = Intent(this, PassagerActivity::class.java)
+            intentForAutoAuth = Intent(this, PassagerActivityGoogle::class.java)
         }
         else{
 //            Toast.makeText(baseContext, "Opertunity failed", Toast.LENGTH_SHORT).show()

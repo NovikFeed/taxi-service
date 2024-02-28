@@ -164,7 +164,7 @@ class RegisterActivity : AppCompatActivity() {
             intent = Intent(this, DriverActivity::class.java)
         }
         else if(choose == "passenger"){
-            intent = Intent(this, PassagerActivity::class.java)
+            intent = Intent(this, PassagerActivityGoogle::class.java)
         }
     }
 

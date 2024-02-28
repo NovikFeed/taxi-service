@@ -124,7 +124,7 @@ class LoginActivity : AppCompatActivity() {
             intent = Intent(this, DriverActivity::class.java)
         }
         else if(choose == "passenger"){
-            intent = Intent(this, PassagerActivity::class.java)
+            intent = Intent(this, PassagerActivityGoogle::class.java)
         }
         else{
             Toast.makeText(baseContext, "Opertunity failed", Toast.LENGTH_SHORT).show()
