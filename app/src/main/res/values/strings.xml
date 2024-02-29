@@ -15,4 +15,6 @@
     <string name="hintPassword">enter your password</string>
     <string name="chooseYou">Who are you?</string>
     <string name="lengthPassword">Password length is less than 6 characters</string>
+    <string name="title_activity_passager_google">PassagerActivityGoogle</string>
+    <string name="titleBottomSheet">Where are we going?</string>
 </resources>

@@ -5,13 +5,23 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.location.Address
+import android.location.Geocoder
 import android.location.Location
+import android.location.LocationListener
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 
 import android.util.Log
+import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.TextView
 import androidx.core.app.ActivityCompat
 
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -29,20 +39,29 @@ import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.LocationSettingsResponse
 import com.google.android.gms.location.Priority
 import com.google.android.gms.location.SettingsClient
+import com.google.android.gms.maps.GoogleMap.OnCameraIdleListener
+import com.google.android.gms.maps.GoogleMap.OnCameraMoveListener
+import com.google.android.gms.maps.GoogleMap.OnCameraMoveStartedListener
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.tasks.OnCompleteListener
 import com.google.android.gms.tasks.Task
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.firebase.database.core.Context
+import java.io.IOException
+import java.util.Locale
 
-class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
+class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationListener, OnCameraMoveListener, OnCameraIdleListener, OnCameraMoveStartedListener {
 
     private lateinit var mMap: GoogleMap
     private lateinit var binding: ActivityPassagerGoogleBinding
     private lateinit var fusedLocation : FusedLocationProviderClient
-    lateinit var markerUser: Marker
-    lateinit var userCord: LatLng
+    lateinit var inputAddress : EditText
+    lateinit var autoChooseAddress : TextView
+    lateinit var buttonEnableCameraMoveListener: ImageButton
+    lateinit var pinChooseAddress : ImageView
+    var isCameraTrakingEnable : Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,27 +69,46 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
 
         binding = ActivityPassagerGoogleBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        // Obtain the SupportMapFragment and get notified when the map is ready to be used.
+        setView()
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
+        val sheet = findViewById<FrameLayout>(R.id.sheet)
+        try {
+            BottomSheetBehavior.from(sheet).apply {
+                peekHeight = 200
+                this.state = BottomSheetBehavior.STATE_COLLAPSED
+            }
+        }
+        catch (e: Exception){
+            Log.e("EROR", e.toString())
+        }
+        buttonEnableCameraMoveListener.setOnClickListener{
+            chooseAddressWithPin()
+        }
+
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
         if (checkEnableLocation()){
         setUpMap()}
+        try {
+            mMap.setOnCameraIdleListener(this)
+            mMap.setOnCameraMoveStartedListener(this)
+            mMap.setOnCameraMoveListener(this)
+        }
+         catch(e : Exception){
+         }
+
+    }
+
+    private fun setView(){
+        inputAddress = findViewById(R.id.inputAddress)
+        autoChooseAddress = findViewById(R.id.autoChooseAddress)
+        buttonEnableCameraMoveListener = findViewById(R.id.enableListner)
+        pinChooseAddress = findViewById(R.id.pin)
 
     }
     fun setUpMap(){
@@ -164,4 +202,67 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val REQUEST_CHECK_SETTINGS = 123
     }
+
+    override fun onLocationChanged(location: Location) {
+        val geocoder = Geocoder(this, Locale.getDefault())
+        val adres : List<Address>? = null
+        try{
+            geocoder.getFromLocation(location.latitude, location.longitude, 1)
+        }
+        catch (e : IOException){
+            Log.e("Eror", e.toString())
+        }
+        setAddres(adres!![0])
+    }
+
+    private fun setAddres(address: Address) {
+        if(address != null){
+            if(address.getAddressLine(0) != null){
+                autoChooseAddress.setText(address.getAddressLine(0))
+            }
+//            if(address.getAddressLine(1) != null){
+//                inputAddress.text.toString() + address.getAddressLine(1)
+//                 }
+        }
+    }
+
+    override fun onCameraMove() {
+    }
+
+    override fun onCameraIdle() {
+        if(isCameraTrakingEnable) {
+            var addresses: List<Address>? = null
+            val geocoder = Geocoder(this, Locale.getDefault())
+            try {
+                addresses = geocoder.getFromLocation(
+                    mMap.cameraPosition.target.latitude,
+                    mMap.cameraPosition.target.longitude,
+                    1
+                )
+                setAddres(addresses!![0])
+            } catch (e: IOException) {
+                Log.e("Eror", e.toString())
+            } catch (e: IndexOutOfBoundsException) {
+                Log.e("Eror", e.toString())
+            }
+        }
+
+    }
+
+    override fun onCameraMoveStarted(p0: Int) {
+    }
+
+    private fun chooseAddressWithPin(){
+        if(autoChooseAddress.visibility == View.VISIBLE){
+            isCameraTrakingEnable = false
+            autoChooseAddress.visibility = View.INVISIBLE
+            pinChooseAddress.visibility = View.INVISIBLE
+        }
+        else{
+            isCameraTrakingEnable = true
+            autoChooseAddress.visibility = View.VISIBLE
+            pinChooseAddress.visibility = View.VISIBLE
+        }
+    }
+
 }
