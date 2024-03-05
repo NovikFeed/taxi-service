@@ -17,4 +17,7 @@
     <string name="lengthPassword">Password length is less than 6 characters</string>
     <string name="title_activity_passager_google">PassagerActivityGoogle</string>
     <string name="titleBottomSheet">Where are we going?</string>
+    <string name="google_map_api_key">AIzaSyCIImlRY7oKERtUGcHdTap5e0folYDIlsM</string>
+    <string name="butSetRoute">Set Route</string>
+    <string name="google_map_api_key_for_request">AIzaSyCeBDjHnro9goaDzqiV5kY7FSkVCrXJe54</string>
 </resources>

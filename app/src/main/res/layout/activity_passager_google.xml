@@ -50,18 +50,21 @@
             map:layout_anchor="@+id/sheet"
             map:layout_anchorGravity="center" />
 
-        <EditText
-            android:id="@+id/inputAddress"
+        <androidx.cardview.widget.CardView
+            android:id="@+id/searchView"
             android:layout_width="250dp"
-            android:layout_height="wrap_content"
-            android:layout_gravity="start|top"
+            android:layout_marginTop="120dp"
+            android:layout_height="62dp"
             android:layout_marginLeft="20dp"
-            android:layout_marginTop="134dp"
-            android:ems="10"
-            android:fontFamily="monospace"
-            android:hint="Enter addresses"
-            android:inputType="text"
-            android:textSize="22sp" />
+            android:background="@color/black">
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/fragmentAutocomplete"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
+                />
+        </androidx.cardview.widget.CardView>
+
 
         <ImageButton
             android:id="@+id/enableListner"
@@ -77,12 +80,25 @@
             android:id="@+id/autoChooseAddress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="TextView"
+            android:text=""
             android:visibility="invisible"
             android:fontFamily="monospace"
             android:textSize="16sp"
             android:layout_marginLeft="20dp"
             android:layout_marginTop="80dp"/>
+
+        <Button
+            android:id="@+id/buttonSetRout"
+            android:layout_width="370dp"
+            android:layout_height="62dp"
+            android:layout_marginTop="200dp"
+            android:layout_marginRight="34dp"
+            android:layout_marginLeft="20dp"
+            android:text="@string/butSetRoute"
+            android:textFontWeight="600"
+            android:textSize="25sp"
+            android:textColor="@color/white"
+            android:background="@color/purple"/>
 
     </FrameLayout>
 
