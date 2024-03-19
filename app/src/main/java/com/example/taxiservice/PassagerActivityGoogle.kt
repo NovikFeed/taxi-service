@@ -8,6 +8,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.location.Address
 import android.location.Geocoder
+import android.location.GnssAntennaInfo.Listener
 import android.location.Location
 import android.location.LocationListener
 import android.os.AsyncTask
@@ -19,6 +20,7 @@ import android.os.Handler
 import android.os.Looper
 
 import android.util.Log
+import android.view.LayoutInflater
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -64,7 +66,16 @@ import com.google.android.libraries.places.widget.Autocomplete
 import com.google.android.libraries.places.widget.AutocompleteSupportFragment
 import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.android.material.bottomsheet.BottomSheetBehavior
+import com.google.firebase.database.ChildEventListener
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.core.ChildEventRegistration
 import com.google.firebase.database.core.Context
+import com.google.firebase.database.getValue
+import com.google.firebase.database.ktx.database
+import com.google.firebase.ktx.Firebase
 import com.google.gson.Gson
 import com.squareup.okhttp.OkHttpClient
 import com.squareup.okhttp.Request
@@ -73,22 +84,29 @@ import `in`.blogspot.kmvignesh.googlemapexample.PolyLine
 import java.io.IOException
 import java.util.Locale
 
-class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationListener, OnCameraMoveListener, OnCameraIdleListener, OnCameraMoveStartedListener {
+open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationListener, OnCameraMoveListener, OnCameraIdleListener, OnCameraMoveStartedListener {
 
     private lateinit var mMap: GoogleMap
     private lateinit var autocompleteFragment: AutocompleteSupportFragment
     private lateinit var binding: ActivityPassagerGoogleBinding
-    private lateinit var fusedLocation : FusedLocationProviderClient
-    private var markerFindAddressWithSearchView : Marker? = null
-    private lateinit var autoChooseAddress : TextView
+    private lateinit var fusedLocation: FusedLocationProviderClient
+    private var markerFindAddressWithSearchView: Marker? = null
+    private lateinit var autoChooseAddress: TextView
+    private lateinit var priceText : TextView
     private lateinit var buttonEnableCameraMoveListener: ImageButton
-    private lateinit var pinChooseAddress : ImageView
-    private lateinit var bottomSheet :  BottomSheetBehavior<FrameLayout>
-    private lateinit var buttonSetRoute : Button
+    private lateinit var pinChooseAddress: ImageView
+    private lateinit var bottomSheet: BottomSheetBehavior<FrameLayout>
+    private lateinit var buttonSetRoute: Button
+    private lateinit var buttonMakeAnOrder : Button
     private lateinit var poliLine: Polyline
-    private var isCameraTrakingEnable : Boolean = false
-    private var chooseAddressWithPin : LatLng = LatLng(0.0,0.0)
-    private var chooseAddressWithSearch : LatLng =  LatLng(0.0,0.0)
+    private lateinit var dataBase: DatabaseReference
+    private lateinit var myChildEvenListener: ChildEventListener
+    private lateinit var distanceBetweenPoints: String
+    private var isCameraTrakingEnable: Boolean = false
+    private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
+    private var chooseAddressWithSearch: LatLng = LatLng(0.0, 0.0)
+    private var isStartOrder: Boolean = false
+
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,52 +122,69 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
         val sheet = findViewById<FrameLayout>(R.id.sheet)
+        setListenerDriverPosition()
         try {
             bottomSheet = BottomSheetBehavior.from(sheet)
-                bottomSheet.apply {
+            bottomSheet.apply {
                 peekHeight = 200
                 this.state = BottomSheetBehavior.STATE_COLLAPSED
             }
-        }
-        catch (e: Exception){
+        } catch (e: Exception) {
             Log.e("EROR", e.toString())
         }
-        buttonEnableCameraMoveListener.setOnClickListener{
+        buttonEnableCameraMoveListener.setOnClickListener {
             chooseAddressWithPin()
+            if(isStartOrder){
+                setStyleButtonStartOrder()
+            }
         }
-        buttonSetRoute.setOnClickListener{setRoute()}
+        buttonSetRoute.setOnClickListener { setRoute() }
 
+    }
+
+    override fun onStop() {
+        super.onStop()
+        dataBase.removeEventListener(myChildEvenListener)
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
-        if (checkEnableLocation()){
+        if (checkEnableLocation()) {
             if (ActivityCompat.checkSelfPermission(
                     this,
-                    Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
                 Log.i("Device", "Permission Off")
                 requestPermission()
-            }
-            setStartPosition()}
+            } else
+                setStartPosition()
+        }
         try {
             mMap.setOnCameraIdleListener(this)
             mMap.setOnCameraMoveStartedListener(this)
             mMap.setOnCameraMoveListener(this)
+        } catch (e: Exception) {
         }
-         catch(e : Exception){
-         }
 
     }
 
-    private fun setView(){
+    private fun setView() {
+        dataBase =
+            Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
+                "users"
+            )
+        buttonMakeAnOrder = findViewById(R.id.startOrder)
+        priceText = findViewById(R.id.priceText)
         buttonSetRoute = findViewById(R.id.buttonSetRout)
         autoChooseAddress = findViewById(R.id.autoChooseAddress)
         buttonEnableCameraMoveListener = findViewById(R.id.enableListner)
         pinChooseAddress = findViewById(R.id.pin)
 
     }
-    fun setStartPosition(){
+
+    fun setStartPosition() {
         if (ActivityCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
@@ -162,18 +197,19 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
             requestPermission()
         }
         mMap.isMyLocationEnabled = true
-        var userPosition : LatLng
-        fusedLocation.lastLocation.addOnSuccessListener(this){location ->
-            if(location != null){
+        var userPosition: LatLng
+        fusedLocation.lastLocation.addOnSuccessListener(this) { location ->
+            if (location != null) {
                 userPosition = LatLng(location.latitude, location.longitude)
                 mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(userPosition, 18.0f))
 
             }
         }
     }
-    private fun getUserPosition(callback:(LatLng) -> Unit){
-         var userPosition : LatLng = LatLng(0.0,0.0)
-        if(checkEnableLocation()) {
+
+    private fun getUserPosition(callback: (LatLng) -> Unit) {
+        var userPosition: LatLng = LatLng(0.0, 0.0)
+        if (checkEnableLocation()) {
             if (ActivityCompat.checkSelfPermission(
                     this,
                     Manifest.permission.ACCESS_FINE_LOCATION
@@ -195,8 +231,12 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
         }
     }
 
-    private fun requestPermission(){
-        ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),LOCATION_PERMISSION_REQUEST_CODE)
+    private fun requestPermission() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
+            LOCATION_PERMISSION_REQUEST_CODE
+        )
     }
 
     override fun onRequestPermissionsResult(
@@ -205,73 +245,70 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if(requestCode == LOCATION_PERMISSION_REQUEST_CODE){
-            if(grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED){
-            }
-            else{
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                setStartPosition()
+            } else {
                 requestPermission()
             }
-        }
-        else{
+        } else {
         }
 
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        when(requestCode){
+        when (requestCode) {
             REQUEST_CHECK_SETTINGS -> {
-                if(resultCode != RESULT_OK){
+                if (resultCode != RESULT_OK) {
                     checkEnableLocation()
-                }
-                else{
-
                 }
             }
         }
     }
-    private fun checkEnableLocation():Boolean{
-        var check : Boolean = true
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,5000).build()
+
+    private fun checkEnableLocation(): Boolean {
+        var check: Boolean = true
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000).build()
         val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
         val client: SettingsClient = LocationServices.getSettingsClient(this)
-        val task : Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
+        val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
         task.addOnSuccessListener {
             check = true
         }
-        task.addOnFailureListener{exception ->
+        task.addOnFailureListener { exception ->
             check = false
-            if(exception is ResolvableApiException){
-                try{
+            if (exception is ResolvableApiException) {
+                try {
                     exception.startResolutionForResult(this, REQUEST_CHECK_SETTINGS)
 
+                } catch (sendEx: IntentSender.SendIntentException) {
                 }
-                catch (sendEx: IntentSender.SendIntentException){}
             }
         }
-            return check
+        return check
     }
-    companion object{
+
+    companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private const val REQUEST_CHECK_SETTINGS = 123
     }
 
     override fun onLocationChanged(location: Location) {
         val geocoder = Geocoder(this, Locale.getDefault())
-        val adres : List<Address>? = null
-        try{
+        val adres: List<Address>? = null
+        try {
             geocoder.getFromLocation(location.latitude, location.longitude, 1)
-        }
-        catch (e : IOException){
+        } catch (e: IOException) {
             Log.e("Eror", e.toString())
         }
         setAddres(adres!![0])
     }
 
     private fun setAddres(address: Address) {
-        if(address != null){
+        if (address != null) {
             autoChooseAddress.visibility = View.VISIBLE
-            if(address.getAddressLine(0) != null){
+            if (address.getAddressLine(0) != null) {
                 autoChooseAddress.setText(address.getAddressLine(0))
             }
 //            if(address.getAddressLine(1) != null){
@@ -284,8 +321,8 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
     }
 
     override fun onCameraIdle() {
-        if(isCameraTrakingEnable) {
-            if(bottomSheet.state == BottomSheetBehavior.STATE_COLLAPSED){
+        if (isCameraTrakingEnable) {
+            if (bottomSheet.state == BottomSheetBehavior.STATE_COLLAPSED) {
                 bottomSheet.state = BottomSheetBehavior.STATE_EXPANDED
             }
             var addresses: List<Address>? = null
@@ -308,19 +345,18 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
     }
 
     override fun onCameraMoveStarted(p0: Int) {
-        if(bottomSheet.state == BottomSheetBehavior.STATE_EXPANDED && isCameraTrakingEnable){
+        if (bottomSheet.state == BottomSheetBehavior.STATE_EXPANDED && isCameraTrakingEnable) {
             bottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
         }
     }
 
-    private fun chooseAddressWithPin(){
-        if(autoChooseAddress.visibility == View.VISIBLE){
+    private fun chooseAddressWithPin() {
+        if (autoChooseAddress.visibility == View.VISIBLE) {
             isCameraTrakingEnable = false
             pinChooseAddress.visibility = View.INVISIBLE
             autoChooseAddress.visibility = View.INVISIBLE
-        }
-        else{
-            if(markerFindAddressWithSearchView != null){
+        } else {
+            if (markerFindAddressWithSearchView != null) {
                 markerFindAddressWithSearchView?.remove()
             }
             isCameraTrakingEnable = true
@@ -328,24 +364,39 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
             pinChooseAddress.visibility = View.VISIBLE
         }
     }
-    private fun hideBottomSheet(){
+
+    private fun hideBottomSheet() {
         bottomSheet.state = BottomSheetBehavior.STATE_COLLAPSED
     }
-    private fun autoComplete(){
-        if(Places.isInitialized()){
+
+    private fun autoComplete() {
+        if (Places.isInitialized()) {
             Places.deinitialize()
         }
         Places.initialize(this, getString(R.string.google_map_api_key))
         autocompleteFragment = supportFragmentManager.findFragmentById(R.id.fragmentAutocomplete)
                 as AutocompleteSupportFragment
-        autocompleteFragment.setPlaceFields(listOf(Place.Field.ID, Place.Field.ADDRESS, Place.Field.LAT_LNG))
+        autocompleteFragment.setPlaceFields(
+            listOf(
+                Place.Field.ID,
+                Place.Field.ADDRESS,
+                Place.Field.LAT_LNG
+            )
+        )
         autocompleteFragment.setCountries("UA")
-        autocompleteFragment.setOnPlaceSelectedListener(object : PlaceSelectionListener{
+        autocompleteFragment.setOnPlaceSelectedListener(object : PlaceSelectionListener {
             override fun onError(p0: Status) {
-                Toast.makeText(this@PassagerActivityGoogle, "Error search place", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this@PassagerActivityGoogle,
+                    "Error search place",
+                    Toast.LENGTH_SHORT
+                ).show()
             }
 
             override fun onPlaceSelected(place: Place) {
+                if(isStartOrder){
+                    setStyleButtonStartOrder()
+                }
                 val latLng = place.latLng
                 setMarkerAndCamera(latLng)
                 chooseAddressWithSearch = latLng
@@ -353,71 +404,103 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
 
         })
     }
-        private fun setMarkerAndCamera(latLng: LatLng){
-            if(markerFindAddressWithSearchView != null){
-                markerFindAddressWithSearchView?.remove()
-            }
-            markerFindAddressWithSearchView = mMap.addMarker(MarkerOptions().position(latLng))!!
-            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
+
+    private fun setMarkerAndCamera(latLng: LatLng) {
+        if (markerFindAddressWithSearchView != null) {
+            markerFindAddressWithSearchView?.remove()
         }
-// this block for draw route between location user and chooses location
-    private fun setRoute(){
-            lateinit var userPosition : LatLng
-            var destPosition: LatLng = LatLng(0.0,0.0)
-            getUserPosition {
-                userPosition = it
-                Log.i("Coord", userPosition.toString())
-                if (isCameraTrakingEnable && chooseAddressWithPin != LatLng(0.0,0.0)) {
-                    setMarkerAndCamera(chooseAddressWithPin)
-                    chooseAddressWithPin()
-                    destPosition = chooseAddressWithPin
-
-                } else if(!isCameraTrakingEnable && chooseAddressWithSearch != LatLng(0.0,0.0)){
-                    destPosition = chooseAddressWithSearch
-                }
-                else {
-                    Toast.makeText(this@PassagerActivityGoogle, "You have not selected a destination", Toast.LENGTH_SHORT).show()
-                }
-                if(destPosition != LatLng(0.0,0.0) && userPosition != LatLng(0.0,0.0)){
-                    hideBottomSheet()
-                    val URL = getDirectionURL(userPosition, destPosition)
-                    GetDirection(URL).execute()
-                }
-                else{
-                    Toast.makeText(this@PassagerActivityGoogle, "You have not selected a destination", Toast.LENGTH_SHORT).show()
-
-                }
-            }
-            }
-    private fun getDirectionURL(origin: LatLng, dest: LatLng) : String{
-        return "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}&sensor=false&mode=driving&key=${getString(R.string.google_map_api_key_for_request)}"
+        markerFindAddressWithSearchView = mMap.addMarker(MarkerOptions().position(latLng))!!
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 16f))
     }
-    private inner class GetDirection(val url : String) : AsyncTask<Void,Void,List<List<LatLng>>>(){
+    private fun setStyleButtonStartOrder(){
+        if(!isStartOrder){
+            isStartOrder = true
+            buttonMakeAnOrder.visibility = View.VISIBLE
+            buttonSetRoute.visibility = View.INVISIBLE
+        }
+        else{
+            isStartOrder = false
+            buttonMakeAnOrder.visibility = View.INVISIBLE
+            buttonSetRoute.visibility = View.VISIBLE
+        }
+
+    }
+    private fun setPriceOnOrder(distance : String){
+//        val price = distance.toDouble()*15
+        Log.i("PRICE", "The cost of your trip ${distance}₴")
+//        priceText.text = "The cost of your trip ${price}₴"
+    }
+
+    // this block for draw route between location user and chooses location
+    private fun setRoute() {
+        lateinit var userPosition: LatLng
+        var destPosition: LatLng = LatLng(0.0, 0.0)
+        getUserPosition {
+            userPosition = it
+            Log.i("Coord", userPosition.toString())
+            if (isCameraTrakingEnable && chooseAddressWithPin != LatLng(0.0, 0.0)) {
+                setMarkerAndCamera(chooseAddressWithPin)
+                chooseAddressWithPin()
+                destPosition = chooseAddressWithPin
+
+            } else if (!isCameraTrakingEnable && chooseAddressWithSearch != LatLng(0.0, 0.0)) {
+                destPosition = chooseAddressWithSearch
+            } else {
+                Toast.makeText(
+                    this@PassagerActivityGoogle,
+                    "You have not selected a destination",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            if (destPosition != LatLng(0.0, 0.0) && userPosition != LatLng(0.0, 0.0)) {
+                dataBase.removeEventListener(myChildEvenListener)
+                mMap.clear()
+                hideBottomSheet()
+                val URL = getDirectionURL(userPosition, destPosition)
+                GetDirection(URL).execute()
+                setStyleButtonStartOrder()
+
+            } else {
+                Toast.makeText(
+                    this@PassagerActivityGoogle,
+                    "You have not selected a destination",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+            }
+        }
+    }
+
+    private fun getDirectionURL(origin: LatLng, dest: LatLng): String {
+        return "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}&sensor=false&mode=driving&key=${
+            getString(
+                R.string.google_map_api_key_for_request
+            )
+        }"
+    }
+
+    private inner class GetDirection(val url: String) :
+        AsyncTask<Void, Void, List<List<LatLng>>>() {
         override fun doInBackground(vararg p0: Void?): List<List<LatLng>> {
             val client = OkHttpClient()
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
             val data = response.body()!!.string()
-            Log.d("GoogleMap" , " data : $data")
             val result = ArrayList<List<LatLng>>()
-            try{
+            try {
                 val respObj = Gson().fromJson(data, GoogleMapDTO::class.java)
                 val path = ArrayList<LatLng>()
-                for(i in 0..(respObj.routes[0].legs[0].steps.size-1)) {
-//                    val startLatLng = LatLng(
-//                        respObj.routes[0].legs[0].steps[i].start_location.lat.toDouble(),
-//                        respObj.routes[0].legs[0].steps[i].start_location.lng.toDouble()
-//                    )
-//                    path.add(startLatLng)
-//                    val destLatLng = LatLng(
-//                        respObj.routes[0].legs[0].steps[i].end_location.lat.toDouble(),
-//                        respObj.routes[0].legs[0].steps[i].end_location.lng.toDouble()
-//                    )
+                var distance = 0.0
+                for (i in 0..(respObj.routes[0].legs[0].steps.size - 1)) {
                     path.addAll(decodePolyline(respObj.routes[0].legs[0].steps[i].polyline.points))
+                    distance += respObj.routes[0].legs[0].distance.value
                 }
                 result.add(path)
-            }
-            catch(e : Exception){
+                distanceBetweenPoints = String.format("%.1f", (distance/1000)*12)
+                Handler(Looper.getMainLooper()).post{priceText.text = "The cost of your trip ${distanceBetweenPoints}₴"}
+
+
+            } catch (e: Exception) {
                 e.printStackTrace()
             }
             return result
@@ -425,13 +508,13 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
 
         override fun onPostExecute(result: List<List<LatLng>>) {
             val lineOption = PolylineOptions()
-            for(i in result.indices){
+            for (i in result.indices) {
                 lineOption.addAll(result[i])
                 lineOption.width(13f)
                 lineOption.color(Color.BLACK)
                 lineOption.geodesic(true)
             }
-            if(::poliLine.isInitialized){
+            if (::poliLine.isInitialized) {
                 poliLine.remove()
             }
             poliLine = mMap.addPolyline(lineOption)
@@ -439,6 +522,7 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
         }
 
     }
+
     public fun decodePolyline(encoded: String): List<LatLng> {
 
         val poly = ArrayList<LatLng>()
@@ -469,12 +553,60 @@ class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationL
             val dlng = if (result and 1 != 0) (result shr 1).inv() else result shr 1
             lng += dlng
 
-            val latLng = LatLng((lat.toDouble() / 1E5),(lng.toDouble() / 1E5))
+            val latLng = LatLng((lat.toDouble() / 1E5), (lng.toDouble() / 1E5))
             poly.add(latLng)
         }
 
         return poly
     }
 
+    fun setListenerDriverPosition() {
+        myChildEvenListener = object : ChildEventListener {
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+                processedUserData()
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                processedUserData()
+            }
+
+            override fun onChildRemoved(snapshot: DataSnapshot) {
+
+            }
+
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+            }
+
+        }
+        dataBase.addChildEventListener(myChildEvenListener)
+
     }
+
+    fun processedUserData() {
+        mMap.clear()
+        dataBase.addListenerForSingleValueEvent(object  : ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                for(data in snapshot.children){
+                    val dataUser = data.getValue<User>()
+                    dataUser?.let{
+                        if(it.getChoose() == "driver" && it.getSharedPosition()){
+                            val marker = mMap.addMarker(MarkerOptions().position(it.getCord()))
+                            marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
+                        }
+                    }
+
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                TODO("Not yet implemented")
+            }
+
+        })
+    }
+}
 

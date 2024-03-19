@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -49,6 +50,7 @@ class MainActivity : AppCompatActivity() {
                     user?.let {
                         val choose = it.getChoose()
                         setActivityForIntent(choose)
+                        intentForAutoAuth.putExtra("currentUserUID", currentUser.uid)
                         startActivity(intentForAutoAuth)
                         finish()
                     }
@@ -71,7 +73,7 @@ class MainActivity : AppCompatActivity() {
 
     fun setActivityForIntent(choose : String){
         if(choose == "driver"){
-            intentForAutoAuth = Intent(this, DriverActivity::class.java)
+            intentForAutoAuth = Intent(this, DriverActivityGoogle::class.java)
         }
         else if(choose == "passenger"){
             intentForAutoAuth = Intent(this, PassagerActivityGoogle::class.java)

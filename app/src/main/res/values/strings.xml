@@ -20,4 +20,6 @@
     <string name="google_map_api_key">AIzaSyCIImlRY7oKERtUGcHdTap5e0folYDIlsM</string>
     <string name="butSetRoute">Set Route</string>
     <string name="google_map_api_key_for_request">AIzaSyCeBDjHnro9goaDzqiV5kY7FSkVCrXJe54</string>
+    <string name="title_activity_driver_google">DriverActivityGoogle</string>
+    <string name="butMakeAnOrder">Make an order</string>
 </resources>

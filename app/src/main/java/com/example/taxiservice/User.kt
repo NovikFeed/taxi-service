@@ -1,6 +1,8 @@
 package com.example.taxiservice
 
-data class User(var userName: String = "", var userEmail:String= "", var userPhone: String= "", var userChoose : String= ""){
+import com.google.android.gms.maps.model.LatLng
+
+data class User(var userName: String = "", var userEmail:String= "", var userPhone: String= "", var userChoose : String= "", var positionShared : Boolean= false, var latitude : Double = 0.0, var longitude : Double = 0.0){
     fun getChoose() : String{
         return userChoose
     }
@@ -24,5 +26,11 @@ data class User(var userName: String = "", var userEmail:String= "", var userPho
     }
     fun setPhone(phone : String){
         userPhone = phone
+    }
+    fun getCord() : LatLng{
+        return LatLng(this.latitude, this.longitude)
+    }
+    fun getSharedPosition() : Boolean{
+        return positionShared
     }
 }

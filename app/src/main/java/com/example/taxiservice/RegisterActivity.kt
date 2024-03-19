@@ -41,6 +41,7 @@ class RegisterActivity : AppCompatActivity() {
     //part system var
    private lateinit var auth:FirebaseAuth
    private lateinit var intent : Intent
+   private lateinit var userUID : String
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
@@ -123,9 +124,9 @@ class RegisterActivity : AppCompatActivity() {
                     val user = FirebaseAuth.getInstance().currentUser
                     user?.let{
                         val userUid = it.uid
+                        this.userUID = userUid
                         val firebaseUser = User(userName,userEmail,userPhone,userChose)
                         db.child("users").child(userUid).setValue(firebaseUser).addOnSuccessListener {
-
                             Toast.makeText(baseContext,"Account data saved successfully", Toast.LENGTH_SHORT).show()
                             nextActivity()
                         }.addOnFailureListener { e ->
@@ -161,7 +162,7 @@ class RegisterActivity : AppCompatActivity() {
     }
     private fun setActivityForIntent(choose : String){
         if(choose == "driver"){
-            intent = Intent(this, DriverActivity::class.java)
+            intent = Intent(this, DriverActivityGoogle::class.java)
         }
         else if(choose == "passenger"){
             intent = Intent(this, PassagerActivityGoogle::class.java)
@@ -174,6 +175,7 @@ class RegisterActivity : AppCompatActivity() {
     }
     private fun nextActivity(){
         setActivityForIntent(userChose)
+        intent.putExtra("currentUserUID", userUID)
                 startActivity(intent)
                 finish()
 

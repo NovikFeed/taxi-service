@@ -97,13 +97,15 @@ class LoginActivity : AppCompatActivity() {
                                 userData?.let{
                                     userChooseInFun = userData.getChoose()
                                     setActivityForIntent(userChooseInFun)
+                                    intent.putExtra("currentUserUID", user.uid)
                                     startActivity(intent)
                                     finish()
 
                                 }
                             }
                             else{
-                                Toast.makeText(baseContext, "Read data failed1", Toast.LENGTH_SHORT).show()
+
+                                Toast.makeText(baseContext, "Read data failed (Snapshot.unexist)", Toast.LENGTH_SHORT).show()
                             }
                         }
 
@@ -121,7 +123,7 @@ class LoginActivity : AppCompatActivity() {
     }
     fun setActivityForIntent(choose : String){
         if(choose == "driver"){
-            intent = Intent(this, DriverActivity::class.java)
+            intent = Intent(this, DriverActivityGoogle::class.java)
         }
         else if(choose == "passenger"){
             intent = Intent(this, PassagerActivityGoogle::class.java)

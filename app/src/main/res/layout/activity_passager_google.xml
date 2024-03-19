@@ -76,6 +76,19 @@
             map:srcCompat="@drawable/pin"
             android:background="@color/empty"/>
 
+        <Button
+            android:id="@+id/buttonSetRout"
+            android:layout_width="350dp"
+            android:layout_height="62dp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="200dp"
+            android:layout_marginRight="34dp"
+            android:background="@color/purple"
+            android:text="@string/butSetRoute"
+            android:textColor="@color/white"
+            android:textFontWeight="600"
+            android:textSize="25sp" />
+
         <TextView
             android:id="@+id/autoChooseAddress"
             android:layout_width="wrap_content"
@@ -87,18 +100,34 @@
             android:layout_marginLeft="20dp"
             android:layout_marginTop="80dp"/>
 
-        <Button
-            android:id="@+id/buttonSetRout"
-            android:layout_width="370dp"
-            android:layout_height="62dp"
+        <TextView
+            android:id="@+id/priceText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginTop="200dp"
-            android:layout_marginRight="34dp"
             android:layout_marginLeft="20dp"
-            android:text="@string/butSetRoute"
+            android:fontFamily="monospace"
+            android:textSize="24sp"
             android:textFontWeight="600"
-            android:textSize="25sp"
+            android:visibility="visible"
+            android:text=""
+            android:textColor="@color/black"
+            />
+
+        <Button
+            android:id="@+id/startOrder"
+            android:layout_width="350dp"
+            android:layout_height="62dp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="270dp"
+            android:layout_marginRight="34dp"
+            android:background="@color/purple"
+            android:text="@string/butMakeAnOrder"
             android:textColor="@color/white"
-            android:background="@color/purple"/>
+            android:visibility="invisible"
+            android:textFontWeight="600"
+            android:textSize="25sp" />
+
 
     </FrameLayout>
 
