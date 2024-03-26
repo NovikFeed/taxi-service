@@ -29,7 +29,9 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
+import androidx.fragment.app.Fragment
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -102,10 +104,12 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var dataBase: DatabaseReference
     private lateinit var myChildEvenListener: ChildEventListener
     private lateinit var distanceBetweenPoints: String
+    private lateinit var cardView : CardView
     private var isCameraTrakingEnable: Boolean = false
     private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
     private var chooseAddressWithSearch: LatLng = LatLng(0.0, 0.0)
     private var isStartOrder: Boolean = false
+    private var previusFragment : Fragment? = null
 
 
 
@@ -139,6 +143,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             }
         }
         buttonSetRoute.setOnClickListener { setRoute() }
+        buttonMakeAnOrder.setOnClickListener { makeAnOrder() }
 
     }
 
@@ -175,6 +180,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
                 "users"
             )
+        cardView = findViewById(R.id.searchView)
         buttonMakeAnOrder = findViewById(R.id.startOrder)
         priceText = findViewById(R.id.priceText)
         buttonSetRoute = findViewById(R.id.buttonSetRout)
@@ -304,7 +310,16 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         }
         setAddres(adres!![0])
     }
+    private fun makeAnOrder(){
+        val searchFragment = SearchDriverFragment()
+        val fargmentManager = supportFragmentManager
+        val transaction = fargmentManager.beginTransaction()
+        buttonMakeAnOrder.visibility = View.INVISIBLE
+        cardView.visibility = View.INVISIBLE
+        transaction.replace(R.id.sheet, searchFragment).commit()
+        transaction.addToBackStack(null)
 
+    }
     private fun setAddres(address: Address) {
         if (address != null) {
             autoChooseAddress.visibility = View.VISIBLE
@@ -425,12 +440,6 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         }
 
     }
-    private fun setPriceOnOrder(distance : String){
-//        val price = distance.toDouble()*15
-        Log.i("PRICE", "The cost of your trip ${distance}₴")
-//        priceText.text = "The cost of your trip ${price}₴"
-    }
-
     // this block for draw route between location user and chooses location
     private fun setRoute() {
         lateinit var userPosition: LatLng
@@ -439,7 +448,6 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             userPosition = it
             Log.i("Coord", userPosition.toString())
             if (isCameraTrakingEnable && chooseAddressWithPin != LatLng(0.0, 0.0)) {
-                setMarkerAndCamera(chooseAddressWithPin)
                 chooseAddressWithPin()
                 destPosition = chooseAddressWithPin
 
@@ -453,8 +461,9 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
                 ).show()
             }
             if (destPosition != LatLng(0.0, 0.0) && userPosition != LatLng(0.0, 0.0)) {
-                dataBase.removeEventListener(myChildEvenListener)
                 mMap.clear()
+                dataBase.removeEventListener(myChildEvenListener)
+                setMarkerAndCamera(destPosition)
                 hideBottomSheet()
                 val URL = getDirectionURL(userPosition, destPosition)
                 GetDirection(URL).execute()
@@ -608,5 +617,14 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
 
         })
     }
+
+    override fun onResumeFragments() {
+        super.onResumeFragments()
+        buttonMakeAnOrder.visibility = View.VISIBLE
+        cardView.visibility = View.VISIBLE
+
+    }
+    
+
 }
 
