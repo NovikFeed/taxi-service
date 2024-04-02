@@ -55,6 +55,7 @@
             android:layout_width="250dp"
             android:layout_marginTop="120dp"
             android:layout_height="62dp"
+            android:visibility="visible"
             android:layout_marginLeft="20dp"
             android:background="@color/black">
             <androidx.fragment.app.FragmentContainerView
@@ -85,6 +86,7 @@
             android:layout_marginRight="34dp"
             android:background="@color/purple"
             android:text="@string/butSetRoute"
+            android:visibility="visible"
             android:textColor="@color/white"
             android:textFontWeight="600"
             android:textSize="25sp" />
@@ -124,9 +126,9 @@
             android:background="@color/purple"
             android:text="@string/butMakeAnOrder"
             android:textColor="@color/white"
-            android:visibility="invisible"
             android:textFontWeight="600"
-            android:textSize="25sp" />
+            android:textSize="25sp"
+            android:visibility="gone" />
 
 
     </FrameLayout>

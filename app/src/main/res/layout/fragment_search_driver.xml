@@ -9,8 +9,37 @@
 
     <Button
         android:id="@+id/button4"
-        android:layout_width="75dp"
-        android:layout_gravity="center"
+        android:layout_width="350dp"
+        android:layout_height="62dp"
+        android:layout_marginLeft="20dp"
+        android:layout_marginTop="200dp"
+        android:layout_marginRight="34dp"
+        android:background="@color/purple"
+        android:text="@string/cancel"
+        android:visibility="visible"
+        android:textColor="@color/white"
+        android:textFontWeight="600"
+        android:textSize="25sp" />
+
+    <ProgressBar
+        android:id="@+id/statusBar"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_marginTop="100dp"
+        android:layout_gravity="center_horizontal"/>
+
+    <TextView
+        android:id="@+id/textView14"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="back" />
+        android:text="@string/findDriver"
+        android:textColor="@color/black"
+        android:fontFamily="monospace"
+        android:textSize="24sp"
+        android:layout_marginTop="30dp"
+        android:layout_marginLeft="15dp"
+        android:layout_marginEnd="15dp"
+        android:gravity="center_horizontal"
+        android:textFontWeight="500"/>
+
 </FrameLayout>

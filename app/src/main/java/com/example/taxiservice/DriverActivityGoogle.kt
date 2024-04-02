@@ -26,6 +26,8 @@ import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.example.taxiservice.databinding.ActivityDriverGoogleBinding
+import com.firebase.geofire.GeoFire
+import com.firebase.geofire.GeoLocation
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.Granularity
@@ -63,6 +65,8 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private var isSharedLocation: Boolean = false
     private lateinit var currentUserInDB: DatabaseReference
     private lateinit var currentUserUID: String
+    private lateinit var geoFire: GeoFire
+    private lateinit var dataBase : DatabaseReference
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -154,24 +158,25 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
             setWaitForAccurateLocation(true)
         }.build()
-        // this method init locationRequest depracted in java
-//        locationRequest = LocationRequest.create().apply {
-//            interval = TimeUnit.SECONDS.toMillis(1)
-//            fastestInterval = TimeUnit.SECONDS.toMillis(1)
-//            maxWaitTime = TimeUnit.SECONDS.toMillis(1)
-//            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
-//        }
-        locationCallback = object : LocationCallback(){
-            override fun onLocationResult(location: LocationResult) {
-                super.onLocationResult(location)
-                currentUserInDB.child("latitude").setValue(location.lastLocation!!.latitude)
-                currentUserInDB.child("longitude").setValue(location.lastLocation!!.longitude)
-            }
-        }
 
         currentUserUID = callingIntent.getStringExtra("currentUserUID")!!
         currentUserInDB = Firebase.database.reference.child("users").child(currentUserUID)
         buttonToWork.setOnClickListener { toWork() }
+        dataBase = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("users")
+        geoFire = GeoFire(dataBase)
+        locationCallback = object : LocationCallback(){
+            override fun onLocationResult(location: LocationResult) {
+                super.onLocationResult(location)
+                val coord = GeoLocation(location.lastLocation!!.latitude, location.lastLocation!!.longitude)
+                geoFire.setLocation("location", coord){key, error ->
+                    if (error != null) {
+                        Log.i("HER","Помилка при оновленні локації для користувача $key: ${error.message}")
+                    } else {
+                        Log.i("HER","Локація для користувача $key була успішно оновлена.")
+                    }
+                }
+            }
+        }
     }
 
     override fun onMapReady(googleMap: GoogleMap) {

@@ -43,6 +43,9 @@ import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.example.taxiservice.databinding.ActivityPassagerGoogleBinding
+import com.firebase.geofire.GeoFire
+import com.firebase.geofire.GeoLocation
+import com.firebase.geofire.GeoQueryEventListener
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.common.api.Status
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -85,6 +88,7 @@ import `in`.blogspot.kmvignesh.googlemapexample.GoogleMapDTO
 import `in`.blogspot.kmvignesh.googlemapexample.PolyLine
 import java.io.IOException
 import java.util.Locale
+import java.util.UUID
 
 open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,LocationListener, OnCameraMoveListener, OnCameraIdleListener, OnCameraMoveStartedListener {
 
@@ -102,14 +106,19 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var buttonMakeAnOrder : Button
     private lateinit var poliLine: Polyline
     private lateinit var dataBase: DatabaseReference
+    private lateinit var dataBaseOrders : DatabaseReference
     private lateinit var myChildEvenListener: ChildEventListener
     private lateinit var distanceBetweenPoints: String
     private lateinit var cardView : CardView
+    private lateinit var userPositionForMakeOrder : LatLng
+    private lateinit var userDestinationPositionForMakeOrder : LatLng
+    private lateinit var orderUID : String
     private var isCameraTrakingEnable: Boolean = false
     private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
     private var chooseAddressWithSearch: LatLng = LatLng(0.0, 0.0)
     private var isStartOrder: Boolean = false
-    private var previusFragment : Fragment? = null
+    private var radius : Double = 1.0
+    private var driverWasFound = false
 
 
 
@@ -144,6 +153,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         }
         buttonSetRoute.setOnClickListener { setRoute() }
         buttonMakeAnOrder.setOnClickListener { makeAnOrder() }
+        deleteOrderAfterCancel()
 
     }
 
@@ -176,6 +186,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     }
 
     private fun setView() {
+        dataBaseOrders = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("orders")
         dataBase =
             Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
                 "users"
@@ -314,11 +325,52 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         val searchFragment = SearchDriverFragment()
         val fargmentManager = supportFragmentManager
         val transaction = fargmentManager.beginTransaction()
+        val currentUserUID = getCurrentUserUid()
+        val bundle = Bundle()
+        orderUID = makeUidForOrder()
+        val order = Order("open",userPositionForMakeOrder,LatLng(0.0,0.0),userDestinationPositionForMakeOrder, priceText.text.toString())
+        dataBaseOrders.child(orderUID).setValue(order)
+        dataBase.child(currentUserUID!!).child("currentOrderUID").setValue(orderUID)
+        radius = 1.0
+        driverWasFound = false
+        getDriver()
         buttonMakeAnOrder.visibility = View.INVISIBLE
         cardView.visibility = View.INVISIBLE
+        bundle.putString("UID", orderUID)
+        searchFragment.arguments = bundle
         transaction.replace(R.id.sheet, searchFragment).commit()
-        transaction.addToBackStack(null)
 
+    }
+    private fun getDriver(){
+        val location = GeoLocation(userPositionForMakeOrder.latitude, userPositionForMakeOrder.longitude)
+        val geoFire = GeoFire(dataBase)
+        val geoQuery = geoFire.queryAtLocation(location, radius)
+
+        geoQuery.addGeoQueryEventListener(object  : GeoQueryEventListener{
+            override fun onKeyEntered(key: String?, location: GeoLocation?) {
+                Log.d("HER", key!!)
+            }
+
+            override fun onKeyExited(p0: String?) {
+
+            }
+
+            override fun onKeyMoved(p0: String?, p1: GeoLocation?) {
+
+            }
+
+            override fun onGeoQueryReady() {
+                if(!driverWasFound){
+                    radius++
+                    getDriver()
+                }
+
+            }
+
+            override fun onGeoQueryError(p0: DatabaseError?) {
+
+            }
+        })
     }
     private fun setAddres(address: Address) {
         if (address != null) {
@@ -465,6 +517,8 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
                 dataBase.removeEventListener(myChildEvenListener)
                 setMarkerAndCamera(destPosition)
                 hideBottomSheet()
+                userPositionForMakeOrder = userPosition
+                userDestinationPositionForMakeOrder = destPosition
                 val URL = getDirectionURL(userPosition, destPosition)
                 GetDirection(URL).execute()
                 setStyleButtonStartOrder()
@@ -618,11 +672,21 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         })
     }
 
-    override fun onResumeFragments() {
-        super.onResumeFragments()
-        buttonMakeAnOrder.visibility = View.VISIBLE
-        cardView.visibility = View.VISIBLE
+    private fun makeUidForOrder() : String{
+    return UUID.randomUUID().toString()
+    }
+    private fun deleteOrderAfterCancel(){
+        if(intent.getBooleanExtra("RESTART_INTENT", false)) {
+            val order = intent.getStringExtra("UID")
+            dataBaseOrders.child(order!!).removeValue()
+            val currentUserUID = getCurrentUserUid()
+            dataBase.child(currentUserUID!!).child("currentOrderUID").setValue(null)
+        }
+    }
 
+    private fun getCurrentUserUid():String?{
+        val callIntent = intent
+        return callIntent.getStringExtra("currentUserUID")
     }
     
 
