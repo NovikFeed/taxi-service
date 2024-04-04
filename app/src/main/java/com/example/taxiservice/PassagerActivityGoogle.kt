@@ -1,6 +1,7 @@
 package com.example.taxiservice
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
@@ -109,13 +110,15 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var poliLine: Polyline
     private lateinit var dataBase: DatabaseReference
     private lateinit var dataBaseOrders : DatabaseReference
-    private lateinit var myChildEvenListener: ChildEventListener
+    private lateinit var geoFire : GeoFire
+    //private lateinit var myChildEvenListener: ChildEventListener
     private lateinit var distanceBetweenPoints: String
     private lateinit var cardView : CardView
     private lateinit var userPositionForMakeOrder : LatLng
     private lateinit var userDestinationPositionForMakeOrder : LatLng
     private lateinit var orderUID : String
     private lateinit var geoQuery : GeoQuery
+    private lateinit var geoQueryForDriverIcon: GeoQuery
     private lateinit var currentUserUID : String
     private var isCameraTrakingEnable: Boolean = false
     private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
@@ -140,7 +143,6 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
         val sheet = findViewById<FrameLayout>(R.id.sheet)
-        setListenerDriverPosition()
         try {
             bottomSheet = BottomSheetBehavior.from(sheet)
             bottomSheet.apply {
@@ -156,6 +158,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
                 setStyleButtonStartOrder()
             }
         }
+        setListerForDriverIcon()
         buttonSetRoute.setOnClickListener { setRoute() }
         buttonMakeAnOrder.setOnClickListener { makeAnOrder() }
         deleteOrderAfterCancel()
@@ -164,8 +167,6 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
 
     override fun onStop() {
         super.onStop()
-//        if(checkListenerOnGeoQuery) geoQuery.removeAllListeners()
-        dataBase.removeEventListener(myChildEvenListener)
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
@@ -197,6 +198,8 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
                 "users"
             )
+        geoFire = GeoFire(Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation"))
+
         cardView = findViewById(R.id.searchView)
         buttonMakeAnOrder = findViewById(R.id.startOrder)
         priceText = findViewById(R.id.priceText)
@@ -349,7 +352,6 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     }
     private fun getDriver(){
         val location = GeoLocation(userPositionForMakeOrder.latitude, userPositionForMakeOrder.longitude)
-        val geoFire = GeoFire(Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation"))
         geoQuery = geoFire.queryAtLocation(location, radius)
 
         geoQuery.addGeoQueryEventListener(object  : GeoQueryEventListener{
@@ -543,7 +545,6 @@ private fun restartActivity(){
             }
             if (destPosition != LatLng(0.0, 0.0) && userPosition != LatLng(0.0, 0.0)) {
                 mMap.clear()
-                dataBase.removeEventListener(myChildEvenListener)
                 setMarkerAndCamera(destPosition)
                 hideBottomSheet()
                 userPositionForMakeOrder = userPosition
@@ -654,55 +655,62 @@ private fun restartActivity(){
 
         return poly
     }
-
-    fun setListenerDriverPosition() {
-        myChildEvenListener = object : ChildEventListener {
-            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
-                processedUserData()
-            }
-
-            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
-                processedUserData()
-            }
-
-            override fun onChildRemoved(snapshot: DataSnapshot) {
-
-            }
-
-            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
-
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-            }
-
-        }
-        dataBase.addChildEventListener(myChildEvenListener)
-
-    }
-
-    fun processedUserData() {
-        mMap.clear()
-        dataBase.addListenerForSingleValueEvent(object  : ValueEventListener{
-            override fun onDataChange(snapshot: DataSnapshot) {
-                for(data in snapshot.children){
-                    val dataUser = data.getValue<User>()
-                    dataUser?.let{
-                        if(it.getChoose() == "driver" && it.getSharedPosition()){
-                            val marker = mMap.addMarker(MarkerOptions().position(it.getCord()))
-                            marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
-                        }
+    @SuppressLint("MissingPermission")
+    private fun setListerForDriverIcon(){
+        var driversMarker : MutableMap<String, Marker> = HashMap()
+        var location : LatLng
+            getUserPosition { location = it
+                val userPosition = GeoLocation(location.latitude, location.longitude)
+                geoQueryForDriverIcon = geoFire.queryAtLocation(userPosition, 3.0)
+                mMap.clear()
+                geoQueryForDriverIcon.addGeoQueryEventListener(object : GeoQueryEventListener{
+                    override fun onKeyEntered(key: String?, location: GeoLocation?) {
+                        mMap.clear()
+                        setMarker(location!!, key!!)
                     }
 
-                }
-            }
 
-            override fun onCancelled(error: DatabaseError) {
-                TODO("Not yet implemented")
-            }
+                    override fun onKeyExited(key: String?) {
+                    }
 
-        })
+                    override fun onKeyMoved(key: String?, location: GeoLocation?) {
+                        mMap.clear()
+                        setMarker(location!!, key!!)
+                    }
+
+                    override fun onGeoQueryReady() {
+                    }
+
+                    override fun onGeoQueryError(error: DatabaseError?) {
+                        Log.e("GeoQueryError", error.toString())
+                    }
+                    private fun setMarker(location: GeoLocation, key : String) {
+                       geoQueryForDriverIcon.addGeoQueryEventListener(object : GeoQueryEventListener{
+                           override fun onKeyEntered(key: String?, location: GeoLocation?) {
+                               val marker = mMap.addMarker(MarkerOptions().position(LatLng(location!!.latitude, location.longitude)))
+                                marker!!.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
+                           }
+                           override fun onKeyExited(key: String?) {
+                           }
+
+                           override fun onKeyMoved(key: String?, location: GeoLocation?) {
+                           }
+
+                           override fun onGeoQueryReady() {
+                           }
+
+                           override fun onGeoQueryError(error: DatabaseError?) {
+                               Log.e("GeoQueryError", error.toString())
+
+                           }
+
+                       })
+                    }
+
+                })
+            }
     }
+    
 
     private fun makeUidForOrder() : String{
     return UUID.randomUUID().toString()
