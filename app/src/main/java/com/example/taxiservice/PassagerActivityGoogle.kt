@@ -44,7 +44,9 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import com.example.taxiservice.databinding.ActivityPassagerGoogleBinding
 import com.firebase.geofire.GeoFire
+import com.firebase.geofire.GeoFireUtils
 import com.firebase.geofire.GeoLocation
+import com.firebase.geofire.GeoQuery
 import com.firebase.geofire.GeoQueryEventListener
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.common.api.Status
@@ -113,12 +115,15 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var userPositionForMakeOrder : LatLng
     private lateinit var userDestinationPositionForMakeOrder : LatLng
     private lateinit var orderUID : String
+    private lateinit var geoQuery : GeoQuery
+    private lateinit var currentUserUID : String
     private var isCameraTrakingEnable: Boolean = false
     private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
     private var chooseAddressWithSearch: LatLng = LatLng(0.0, 0.0)
     private var isStartOrder: Boolean = false
     private var radius : Double = 1.0
     private var driverWasFound = false
+    private var checkListenerOnGeoQuery = false
 
 
 
@@ -154,11 +159,12 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         buttonSetRoute.setOnClickListener { setRoute() }
         buttonMakeAnOrder.setOnClickListener { makeAnOrder() }
         deleteOrderAfterCancel()
-
+        checkActiveOrder()
     }
 
     override fun onStop() {
         super.onStop()
+//        if(checkListenerOnGeoQuery) geoQuery.removeAllListeners()
         dataBase.removeEventListener(myChildEvenListener)
     }
 
@@ -325,10 +331,10 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         val searchFragment = SearchDriverFragment()
         val fargmentManager = supportFragmentManager
         val transaction = fargmentManager.beginTransaction()
-        val currentUserUID = getCurrentUserUid()
+        currentUserUID = getCurrentUserUid()!!
         val bundle = Bundle()
         orderUID = makeUidForOrder()
-        val order = Order("open",userPositionForMakeOrder,LatLng(0.0,0.0),userDestinationPositionForMakeOrder, priceText.text.toString())
+        val order = Order("open",userPositionForMakeOrder.latitude, userPositionForMakeOrder.longitude,0.0,0.0,userDestinationPositionForMakeOrder.latitude, userDestinationPositionForMakeOrder.longitude, priceText.text.toString())
         dataBaseOrders.child(orderUID).setValue(order)
         dataBase.child(currentUserUID!!).child("currentOrderUID").setValue(orderUID)
         radius = 1.0
@@ -343,15 +349,21 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     }
     private fun getDriver(){
         val location = GeoLocation(userPositionForMakeOrder.latitude, userPositionForMakeOrder.longitude)
-        val geoFire = GeoFire(dataBase)
-        val geoQuery = geoFire.queryAtLocation(location, radius)
+        val geoFire = GeoFire(Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation"))
+        geoQuery = geoFire.queryAtLocation(location, radius)
 
         geoQuery.addGeoQueryEventListener(object  : GeoQueryEventListener{
             override fun onKeyEntered(key: String?, location: GeoLocation?) {
-                Log.d("HER", key!!)
+                Log.d("PIDORAS", key.toString())
+                driverWasFound = true
+                dataBaseOrders.child(orderUID).child("driver").setValue(key)
+                checkListenerOnGeoQuery = false
+                geoQuery.removeAllListeners()
+
             }
 
             override fun onKeyExited(p0: String?) {
+
 
             }
 
@@ -360,18 +372,36 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             }
 
             override fun onGeoQueryReady() {
-                if(!driverWasFound){
+                if(!driverWasFound) {
+                    if(radius <=10.0){
                     radius++
-                    getDriver()
+                    getDriver()}
+                    else{
+                        dataBaseOrders.child(orderUID).removeValue()
+
+                        Toast.makeText(
+                            this@PassagerActivityGoogle,
+                            "DRIVER NOT FOUND",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        restartActivity()
+                    }
                 }
 
             }
 
             override fun onGeoQueryError(p0: DatabaseError?) {
-
+            Log.e("HER", p0.toString())
             }
         })
+        checkListenerOnGeoQuery = true
     }
+private fun restartActivity(){
+    val intennt = Intent(this@PassagerActivityGoogle, PassagerActivityGoogle::class.java)
+    intennt.putExtra("currentUserUID", getCurrentUserUid())
+    startActivity(intennt)
+    finish()
+}
     private fun setAddres(address: Address) {
         if (address != null) {
             autoChooseAddress.visibility = View.VISIBLE
@@ -498,7 +528,6 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         var destPosition: LatLng = LatLng(0.0, 0.0)
         getUserPosition {
             userPosition = it
-            Log.i("Coord", userPosition.toString())
             if (isCameraTrakingEnable && chooseAddressWithPin != LatLng(0.0, 0.0)) {
                 chooseAddressWithPin()
                 destPosition = chooseAddressWithPin
@@ -519,9 +548,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
                 hideBottomSheet()
                 userPositionForMakeOrder = userPosition
                 userDestinationPositionForMakeOrder = destPosition
-                val URL = getDirectionURL(userPosition, destPosition)
-                GetDirection(URL).execute()
-                setStyleButtonStartOrder()
+                drawRoute(userPosition, destPosition)
 
             } else {
                 Toast.makeText(
@@ -532,6 +559,11 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
 
             }
         }
+    }
+    private fun drawRoute(startPosition : LatLng, destinationPosition: LatLng){
+        val URL = getDirectionURL(startPosition, destinationPosition)
+        GetDirection(URL).execute()
+        setStyleButtonStartOrder()
     }
 
     private fun getDirectionURL(origin: LatLng, dest: LatLng): String {
@@ -687,6 +719,82 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private fun getCurrentUserUid():String?{
         val callIntent = intent
         return callIntent.getStringExtra("currentUserUID")
+    }
+    private fun checkActiveOrder(){
+        var check : String = ""
+        var currentOrderUID : String
+        val userUID = getCurrentUserUid()!!
+        dataBase.child(userUID).addValueEventListener(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if(snapshot.exists()){
+                    val userInfo = snapshot.getValue<User>()
+                    userInfo?.let {
+                       currentOrderUID = userInfo.currentOrderUID
+
+                        dataBaseOrders.child(currentOrderUID).addValueEventListener(object : ValueEventListener{
+                            override fun onDataChange(snapshot: DataSnapshot) {
+                                if(snapshot.exists()){
+                                    val currentOrder = snapshot.getValue<Order>()
+                                    currentOrder?.let {
+                                        check = currentOrder.status
+                                        if(check == "open" || check == "isActive"){
+                                            orderUID = currentOrderUID
+                                            Log.d("KRAKUS", check)
+                                            drawRouteAfterResume(check)
+                                        }
+                                    }
+                                }
+                            }
+
+                            override fun onCancelled(error: DatabaseError) {
+                                TODO("Not yet implemented")
+                            }
+
+
+                        })
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+                TODO("Not yet implemented")
+            }
+
+        })
+    }
+    private fun drawRouteAfterResume(status : String){
+        Log.d("KRAKUS", status)
+
+        var coordDriver : LatLng = LatLng(0.0,0.0)
+        var coordDistination : LatLng = LatLng(0.0,0.0)
+        var coordUser : LatLng =  LatLng(0.0,0.0)
+        dataBaseOrders.child(orderUID).addValueEventListener(object : ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if(snapshot.exists()){
+                    val orderInfo = snapshot.getValue<Order>()
+                    orderInfo?.let {
+                        coordDriver = LatLng(orderInfo.driverCoordLat, orderInfo.driverCoordLng)
+                        coordDistination =
+                            LatLng(orderInfo.destinationCoordLat, orderInfo.destinationCoordLng)
+                        coordUser = LatLng(orderInfo.passagerCoordLat, orderInfo.passagerCoordLng)
+                        mMap.clear()
+                        if (status == "open") {
+                            drawRoute(coordDriver, coordUser)
+                            val marker = mMap.addMarker(MarkerOptions().position(coordDriver))
+                            marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
+                        } else if (status == "isActive") {
+                            drawRoute(coordUser, coordDistination)
+                        } else {
+
+                        }
+                    }
+
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+            }
+        })
     }
     
 

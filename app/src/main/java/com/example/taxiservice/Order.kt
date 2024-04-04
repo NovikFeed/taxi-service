@@ -3,6 +3,6 @@ package com.example.taxiservice
 import com.google.android.gms.maps.model.LatLng
 
 data class Order(
-    var status: String = "", var passagerCoord: LatLng = LatLng(0.0, 0.0),
-    var driverCoord : LatLng = LatLng(0.0,0.0), var distinationCoord : LatLng = LatLng(0.0,0.0), var price : String = " " ) {
+    var status: String = "", var passagerCoordLat: Double = 0.0, var passagerCoordLng: Double = 0.0,
+    var driverCoordLat : Double = 0.0, var driverCoordLng : Double = 0.0, var destinationCoordLat : Double = 0.0, var destinationCoordLng : Double = 0.0, var price : String = " ", var driver : String = " " ) {
 }

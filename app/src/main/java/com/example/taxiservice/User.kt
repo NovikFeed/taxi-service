@@ -2,7 +2,7 @@ package com.example.taxiservice
 
 import com.google.android.gms.maps.model.LatLng
 
-data class User(var userName: String = "", var userEmail:String= "", var userPhone: String= "", var userChoose : String= "", var positionShared : Boolean= false, var latitude : Double = 0.0, var longitude : Double = 0.0){
+data class User(var userName: String = "", var userEmail:String= "", var userPhone: String= "", var userChoose : String= "", var positionShared : Boolean= false, var latitude : Double = 0.0, var longitude : Double = 0.0, var currentOrderUID : String = ""){
     fun getChoose() : String{
         return userChoose
     }
