@@ -31,8 +31,11 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.cardview.widget.CardView
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.core.app.ActivityCompat
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -120,6 +123,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var geoQuery : GeoQuery
     private lateinit var geoQueryForDriverIcon: GeoQuery
     private lateinit var currentUserUID : String
+    private lateinit var fragmentManager : FragmentManager
     private var isCameraTrakingEnable: Boolean = false
     private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
     private var chooseAddressWithSearch: LatLng = LatLng(0.0, 0.0)
@@ -155,7 +159,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         buttonEnableCameraMoveListener.setOnClickListener {
             chooseAddressWithPin()
             if(isStartOrder){
-                setStyleButtonStartOrder()
+//                setStyleButtonStartOrder()
             }
         }
         setListerForDriverIcon()
@@ -332,8 +336,8 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     }
     private fun makeAnOrder(){
         val searchFragment = SearchDriverFragment()
-        val fargmentManager = supportFragmentManager
-        val transaction = fargmentManager.beginTransaction()
+        fragmentManager = supportFragmentManager
+        val transaction = fragmentManager.beginTransaction()
         currentUserUID = getCurrentUserUid()!!
         val bundle = Bundle()
         orderUID = makeUidForOrder()
@@ -344,10 +348,11 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         driverWasFound = false
         getDriver()
         buttonMakeAnOrder.visibility = View.INVISIBLE
-        cardView.visibility = View.INVISIBLE
         bundle.putString("UID", orderUID)
         searchFragment.arguments = bundle
         transaction.replace(R.id.sheet, searchFragment).commit()
+
+
 
     }
     private fun getDriver(){
@@ -356,11 +361,14 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
 
         geoQuery.addGeoQueryEventListener(object  : GeoQueryEventListener{
             override fun onKeyEntered(key: String?, location: GeoLocation?) {
-                Log.d("PIDORAS", key.toString())
-                driverWasFound = true
-                dataBaseOrders.child(orderUID).child("driver").setValue(key)
-                checkListenerOnGeoQuery = false
-                geoQuery.removeAllListeners()
+                if(!driverWasFound) {
+                    driverWasFound = true
+                    dataBaseOrders.child(orderUID).child("driver").setValue(key)
+                    checkListenerOnGeoQuery = false
+                    setRouteDriverToUser()
+                    geoQuery.removeAllListeners()
+
+                }
 
             }
 
@@ -397,6 +405,17 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             }
         })
         checkListenerOnGeoQuery = true
+    }
+
+    private fun setDriverFragment(){
+        val nextFragment = DriverIsFound()
+        val transaction = fragmentManager.beginTransaction()
+        val bundle = Bundle()
+        bundle.putString("currentOrder", orderUID)
+        nextFragment.arguments = bundle
+        transaction.replace(R.id.sheet, nextFragment).commit()
+
+
     }
 private fun restartActivity(){
     val intennt = Intent(this@PassagerActivityGoogle, PassagerActivityGoogle::class.java)
@@ -527,6 +546,7 @@ private fun restartActivity(){
     // this block for draw route between location user and chooses location
     private fun setRoute() {
         lateinit var userPosition: LatLng
+        geoQueryForDriverIcon.removeAllListeners()
         var destPosition: LatLng = LatLng(0.0, 0.0)
         getUserPosition {
             userPosition = it
@@ -550,6 +570,7 @@ private fun restartActivity(){
                 userPositionForMakeOrder = userPosition
                 userDestinationPositionForMakeOrder = destPosition
                 drawRoute(userPosition, destPosition)
+                setStyleButtonStartOrder()
 
             } else {
                 Toast.makeText(
@@ -564,8 +585,7 @@ private fun restartActivity(){
     private fun drawRoute(startPosition : LatLng, destinationPosition: LatLng){
         val URL = getDirectionURL(startPosition, destinationPosition)
         GetDirection(URL).execute()
-        setStyleButtonStartOrder()
-    }
+        }
 
     private fun getDirectionURL(origin: LatLng, dest: LatLng): String {
         return "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}&sensor=false&mode=driving&key=${
@@ -657,7 +677,6 @@ private fun restartActivity(){
     }
     @SuppressLint("MissingPermission")
     private fun setListerForDriverIcon(){
-        var driversMarker : MutableMap<String, Marker> = HashMap()
         var location : LatLng
             getUserPosition { location = it
                 val userPosition = GeoLocation(location.latitude, location.longitude)
@@ -710,7 +729,7 @@ private fun restartActivity(){
                 })
             }
     }
-    
+
 
     private fun makeUidForOrder() : String{
     return UUID.randomUUID().toString()
@@ -746,8 +765,10 @@ private fun restartActivity(){
                                     currentOrder?.let {
                                         check = currentOrder.status
                                         if(check == "open" || check == "isActive"){
+                                            buttonMakeAnOrder.visibility = View.INVISIBLE
+                                            cardView.visibility = View.INVISIBLE
                                             orderUID = currentOrderUID
-                                            Log.d("KRAKUS", check)
+                                            geoQueryForDriverIcon.removeAllListeners()
                                             drawRouteAfterResume(check)
                                         }
                                     }
@@ -755,7 +776,6 @@ private fun restartActivity(){
                             }
 
                             override fun onCancelled(error: DatabaseError) {
-                                TODO("Not yet implemented")
                             }
 
 
@@ -765,14 +785,11 @@ private fun restartActivity(){
             }
 
             override fun onCancelled(error: DatabaseError) {
-                TODO("Not yet implemented")
             }
 
         })
     }
     private fun drawRouteAfterResume(status : String){
-        Log.d("KRAKUS", status)
-
         var coordDriver : LatLng = LatLng(0.0,0.0)
         var coordDistination : LatLng = LatLng(0.0,0.0)
         var coordUser : LatLng =  LatLng(0.0,0.0)
@@ -781,17 +798,26 @@ private fun restartActivity(){
                 if(snapshot.exists()){
                     val orderInfo = snapshot.getValue<Order>()
                     orderInfo?.let {
+                        fragmentManager = supportFragmentManager
+                        val nextFragment = DriverIsFound()
+                        val transaction = fragmentManager.beginTransaction()
+                        val bundle = Bundle()
+                        bundle.putString("currentOrder",orderUID)
+                        nextFragment.arguments = bundle
                         coordDriver = LatLng(orderInfo.driverCoordLat, orderInfo.driverCoordLng)
                         coordDistination =
                             LatLng(orderInfo.destinationCoordLat, orderInfo.destinationCoordLng)
                         coordUser = LatLng(orderInfo.passagerCoordLat, orderInfo.passagerCoordLng)
                         mMap.clear()
+                        buttonSetRoute.visibility = View.INVISIBLE
                         if (status == "open") {
                             drawRoute(coordDriver, coordUser)
                             val marker = mMap.addMarker(MarkerOptions().position(coordDriver))
                             marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
+                            transaction.replace(R.id.sheet, nextFragment).commit()
                         } else if (status == "isActive") {
                             drawRoute(coordUser, coordDistination)
+                            transaction.replace(R.id.sheet, nextFragment).commit()
                         } else {
 
                         }
@@ -802,6 +828,41 @@ private fun restartActivity(){
 
             override fun onCancelled(error: DatabaseError) {
             }
+        })
+    }
+    private fun setRouteDriverToUser(){
+        dataBaseOrders.addChildEventListener(object : ChildEventListener{
+            override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
+            }
+
+            override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+                if(snapshot.exists()){
+                    val data = snapshot.getValue<Order>()
+                    data?.let {
+                        if(LatLng(it.destinationCoordLat, it.destinationCoordLng) == userDestinationPositionForMakeOrder){
+                            if(it.driverCoordLat != 0.0 && it.driverCoordLng != 0.0) {
+                                mMap.clear()
+                                drawRoute(
+                                    LatLng(it.driverCoordLat, it.driverCoordLng),
+                                    userPositionForMakeOrder
+                                )
+                                dataBaseOrders.removeEventListener(this)
+                                setDriverFragment()
+                            }
+                        }
+                    }
+                }
+            }
+
+            override fun onChildRemoved(snapshot: DataSnapshot) {
+            }
+
+            override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+            }
+
         })
     }
     

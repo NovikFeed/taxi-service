@@ -7,11 +7,15 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
+import android.os.AsyncTask
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract.Data
 import android.util.Log
@@ -20,6 +24,7 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -42,6 +47,9 @@ import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.location.LocationSettingsResponse
 import com.google.android.gms.location.Priority
 import com.google.android.gms.location.SettingsClient
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.Polyline
+import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.gms.tasks.Task
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.firebase.database.ChildEventListener
@@ -52,10 +60,17 @@ import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
 import com.google.firebase.database.getValue
 import com.google.firebase.database.ktx.database
+import com.google.firebase.database.snapshots
 import com.google.firebase.ktx.Firebase
+import com.google.gson.Gson
 import com.google.protobuf.Value
+import com.squareup.okhttp.OkHttpClient
+import com.squareup.okhttp.Request
+import `in`.blogspot.kmvignesh.googlemapexample.GoogleMapDTO
+import `in`.blogspot.kmvignesh.googlemapexample.PolyLine
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
 class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
 
@@ -73,7 +88,10 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var geoFire: GeoFire
     private lateinit var dataBase : DatabaseReference
     private lateinit var dataBaseOrders : DatabaseReference
-    private lateinit var myListener : ValueEventListener
+    private lateinit var poliLine : Polyline
+    private lateinit var travelTime : String
+    private lateinit var currentOrderUID : String
+    private var driverHaveOrder = false
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -109,7 +127,8 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         if (!isSharedLocation) {
             startLocationUpdate()
             currentUserInDB.child("positionShared").setValue(true)
-            setChildListener()
+            driverHaveOrder = false
+            processedData()
         } else {
             fusedLocation.removeLocationUpdates(locationCallback)
             currentUserInDB.child("positionShared").setValue(false)
@@ -277,48 +296,64 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         }
 
     }
-    private fun setChildListener(){
-        myListener = object : ValueEventListener{
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if(snapshot.exists()){
-                    val data = snapshot.getValue<Order>()
-                    data?.let {
-                        Log.i("COORD", it.toString())
-                    }
-                }
-            }
-            override fun onCancelled(error: DatabaseError) {
-            }
-
-        }
-        dataBaseOrders.addValueEventListener(myListener)
-    }
     private fun processedData(){
-        dataBaseOrders.addListenerForSingleValueEvent(object  : ValueEventListener{
+        dataBaseOrders.addValueEventListener(object  : ValueEventListener{
             override fun onDataChange(snapshot: DataSnapshot) {
             for(data in snapshot.children){
                 val dataOrder = data.getValue<Order>()
                 dataOrder?.let{
-                    if(it.driver == currentUserUID){
-                        val passagerAddress = getAddressFromCoordinates(LatLng(it.passagerCoordLat,it.passagerCoordLng))
-                        val distLocation = getAddressFromCoordinates(LatLng(it.destinationCoordLat,it.destinationCoordLng))
-                        val alertDialog = AlertDialog.Builder(this@DriverActivityGoogle)
-                        alertDialog.setTitle("Order")
-                        alertDialog.setMessage("$passagerAddress -> $distLocation $\n The cost of the order $it.price")
-                        alertDialog.setPositiveButton("Okey"){dialog, which ->
+                    if(!driverHaveOrder) {
+                        if (it.driver == currentUserUID && it.status == "open") {
+                            driverHaveOrder = true
+                            currentOrderUID = data.key!!
+                            val passagerAddress = getAddressFromCoordinates(
+                                LatLng(
+                                    it.passagerCoordLat,
+                                    it.passagerCoordLng
+                                )
+                            )
 
+                            val distLocation = getAddressFromCoordinates(
+                                LatLng(
+                                    it.destinationCoordLat,
+                                    it.destinationCoordLng
+                                )
+                            )
+                            setMyName()
+                            val alertDialog = AlertDialog.Builder(this@DriverActivityGoogle)
+                            alertDialog.setTitle("Order")
+                            alertDialog.setMessage("$passagerAddress -> $distLocation  ${it.price}")
+                            alertDialog.setCancelable(false)
+                            alertDialog.setPositiveButton("Okey") { dialog, which ->
+
+                                setRouteToPassanger(it)
+                                openMapApp(it.passagerCoordLat, it.passagerCoordLng  )
+                            }
+                            alertDialog.show()
                         }
-                        alertDialog.show()
                     }
                 }
             }
             }
 
             override fun onCancelled(error: DatabaseError) {
-                TODO("Not yet implemented")
+                Log.d("COORD", error.message)
             }
 
         })
+    }
+    private fun setRouteToPassanger(order : Order){
+        val passangerPosition = LatLng(order.passagerCoordLat, order.passagerCoordLng)
+        getCurrentPosition {
+            dataBaseOrders.child(currentOrderUID).child("driverCoordLat").setValue(it.latitude)
+            dataBaseOrders.child(currentOrderUID).child("driverCoordLng").setValue(it.longitude)
+            val driverPosition = it
+            val url = getDirectionURL(driverPosition, passangerPosition)
+            GetDirection(url).execute()
+        }
+        dataBaseOrders.child(currentOrderUID).child("timeToUser").setValue(travelTime)
+        val marker = mMap.addMarker(MarkerOptions().position(passangerPosition))
+        marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.passenger))
     }
 
     companion object {
@@ -343,6 +378,133 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             e.printStackTrace()
         }
         return addressResult
+    }
+    @SuppressLint("MissingPermission")
+    private fun getCurrentPosition(callback : (LatLng) -> Unit){
+
+        fusedLocation.lastLocation.addOnSuccessListener(this) {location ->
+            if(location != null) {
+
+                val userPosition = LatLng(location.latitude, location.longitude)
+                callback(userPosition)
+            }
+
+        }
+    }
+    private fun getDirectionURL(origin: LatLng, dest: LatLng): String {
+        return "https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${dest.latitude},${dest.longitude}&sensor=false&mode=driving&key=${
+            getString(
+                R.string.google_map_api_key_for_request
+            )
+        }"
+    }
+
+    private inner class GetDirection(val url: String) :
+        AsyncTask<Void, Void, List<List<LatLng>>>() {
+        override fun doInBackground(vararg p0: Void?): List<List<LatLng>> {
+            val client = OkHttpClient()
+            val request = Request.Builder().url(url).build()
+            val response = client.newCall(request).execute()
+            val data = response.body()!!.string()
+            val result = ArrayList<List<LatLng>>()
+            try {
+                val respObj = Gson().fromJson(data, GoogleMapDTO::class.java)
+                val path = ArrayList<LatLng>()
+                var distance = 0.0
+                for (i in 0..(respObj.routes[0].legs[0].steps.size - 1)) {
+                    path.addAll(decodePolyline(respObj.routes[0].legs[0].steps[i].polyline.points))
+                    distance += respObj.routes[0].legs[0].distance.value
+                }
+                travelTime = ("Driver will arrive via" + (distance/1000*1.5).roundToInt().toString() + "min")
+                result.add(path)
+
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            return result
+        }
+
+        override fun onPostExecute(result: List<List<LatLng>>) {
+            val lineOption = PolylineOptions()
+            for (i in result.indices) {
+                lineOption.addAll(result[i])
+                lineOption.width(13f)
+                lineOption.color(Color.BLACK)
+                lineOption.geodesic(true)
+            }
+            if (::poliLine.isInitialized) {
+                poliLine.remove()
+            }
+            poliLine = mMap.addPolyline(lineOption)
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(mMap.cameraPosition.target, 13f))
+        }
+
+    }
+
+    fun decodePolyline(encoded: String): List<LatLng> {
+
+        val poly = ArrayList<LatLng>()
+        var index = 0
+        val len = encoded.length
+        var lat = 0
+        var lng = 0
+
+        while (index < len) {
+            var b: Int
+            var shift = 0
+            var result = 0
+            do {
+                b = encoded[index++].toInt() - 63
+                result = result or (b and 0x1f shl shift)
+                shift += 5
+            } while (b >= 0x20)
+            val dlat = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+            lat += dlat
+
+            shift = 0
+            result = 0
+            do {
+                b = encoded[index++].toInt() - 63
+                result = result or (b and 0x1f shl shift)
+                shift += 5
+            } while (b >= 0x20)
+            val dlng = if (result and 1 != 0) (result shr 1).inv() else result shr 1
+            lng += dlng
+
+            val latLng = LatLng((lat.toDouble() / 1E5), (lng.toDouble() / 1E5))
+            poly.add(latLng)
+        }
+
+        return poly
+    }
+    private fun openMapApp(destLat: Double, destLng : Double){
+         val uri = "geo:$destLat,$destLng"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(uri))
+        intent.setPackage("com.waze")
+        if(intent.resolveActivity(packageManager) != null){
+            startActivity(intent)
+        }
+        else{
+            Toast.makeText(this@DriverActivityGoogle, "Waze application is missing", Toast.LENGTH_SHORT).show()
+        }
+
+    }
+    private fun setMyName(){
+        currentUserInDB.addValueEventListener(object : ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if(snapshot.exists()){
+                    val data = snapshot.getValue<User>()
+                    data?.let {
+                        dataBaseOrders.child(currentOrderUID).child("driverName").setValue(it.userName)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+            }
+
+        })
     }
 
 
