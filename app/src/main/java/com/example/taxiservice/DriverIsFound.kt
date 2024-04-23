@@ -84,6 +84,14 @@ class DriverIsFound : BottomSheetDialogFragment() {
 fun setInfo(uid: String, viewModel: DriverIsFoundViewModel){
     val imageTaxi = painterResource(id = R.drawable.icon)
     val infiniteTransition = rememberInfiniteTransition()
+    val position by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 500f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ), label = ""
+    )
     val animateColor by infiniteTransition.animateColor(
         initialValue = Color.Magenta,
         targetValue = Color.Green,
@@ -91,14 +99,6 @@ fun setInfo(uid: String, viewModel: DriverIsFoundViewModel){
             animation = tween(durationMillis= 2000),
             repeatMode = RepeatMode.Reverse
         ), label = ""
-    )
-    val position by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 500f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 3000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
     )
         Row{
             Surface(modifier = Modifier

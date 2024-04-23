@@ -19,12 +19,15 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract.Data
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentManager
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -108,12 +111,6 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     }
 
 
-    override fun onStop() {
-        super.onStop()
-        fusedLocation.removeLocationUpdates(locationCallback)
-        geoFire.setLocation(currentUserUID, GeoLocation(0.0,0.0))
-        setSharedPositionAfterStop()
-    }
 
     override fun onRestart() {
         super.onRestart()
@@ -327,7 +324,9 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
                             alertDialog.setPositiveButton("Okey") { dialog, which ->
 
                                 setRouteToPassanger(it)
-                                openMapApp(it.passagerCoordLat, it.passagerCoordLng  )
+                                nextFragment(RouteToUserFragment(), R.id.sheetDriver,currentUserUID,currentOrderUID)
+                                buttonToWork.visibility = View.INVISIBLE
+                                //openMapApp(it.passagerCoordLat, it.passagerCoordLng  )
                             }
                             alertDialog.show()
                         }
@@ -351,7 +350,6 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             val url = getDirectionURL(driverPosition, passangerPosition)
             GetDirection(url).execute()
         }
-        dataBaseOrders.child(currentOrderUID).child("timeToUser").setValue(travelTime)
         val marker = mMap.addMarker(MarkerOptions().position(passangerPosition))
         marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.passenger))
     }
@@ -415,7 +413,9 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
                     path.addAll(decodePolyline(respObj.routes[0].legs[0].steps[i].polyline.points))
                     distance += respObj.routes[0].legs[0].distance.value
                 }
-                travelTime = ("Driver will arrive via" + (distance/1000*1.5).roundToInt().toString() + "min")
+                travelTime = ("Driver will arrive via " + (distance/1000*1.5).roundToInt().toString() + " min")
+                dataBaseOrders.child(currentOrderUID).child("timeToUser").setValue(travelTime)
+
                 result.add(path)
 
 
@@ -505,6 +505,41 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             }
 
         })
+    }
+
+    private fun nextFragment(nextFragment: Fragment, thisFragment : Int){
+        val fragmentManager = supportFragmentManager
+        val transaction = fragmentManager.beginTransaction()
+        transaction.replace(thisFragment, nextFragment).commit()
+    }
+    private fun getPassengerCoord(orderUID: String, callback: (DoubleArray) -> Unit){
+        dataBaseOrders.child(orderUID).addListenerForSingleValueEvent(object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if(snapshot.exists()){
+                    val data = snapshot.getValue<Order>()
+                    data?.let {
+                        val arr = DoubleArray(2)
+                        arr.set(0, it.passagerCoordLat)
+                        arr.set(1, it.passagerCoordLng)
+                        callback(arr)
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+            }
+        })
+    }
+    private fun nextFragment(nextFragment: Fragment, thisFragment : Int, driverUid : String, orderUID : String){
+        val fragmentManager = supportFragmentManager
+        val transaction = fragmentManager.beginTransaction()
+        val bundle = Bundle()
+        getPassengerCoord(orderUID) {
+            bundle.putDoubleArray("passengerCoord", it)
+            bundle.putString("driverUID", driverUid)
+            nextFragment.arguments = bundle
+            transaction.replace(thisFragment, nextFragment).commit()
+        }
     }
 
 
