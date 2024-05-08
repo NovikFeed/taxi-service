@@ -28,9 +28,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        val manager = SharedPreferenceManager(this)
         val currentUser = auth.currentUser
         if(currentUser != null){
             getChoose(currentUser)
+            if(!manager.checkData("currentUserUID")){
+                manager.saveData("currentUserUID", currentUser.uid)
+            }
         }
         else{
             val intent = Intent(this, ChoiceActionActivity::class.java)

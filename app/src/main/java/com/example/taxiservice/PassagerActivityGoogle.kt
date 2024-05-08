@@ -814,10 +814,10 @@ private fun restartActivity(){
                             drawRoute(coordDriver, coordUser)
                             val marker = mMap.addMarker(MarkerOptions().position(coordDriver))
                             marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
-                            transaction.replace(R.id.sheet, nextFragment).commit()
+                            transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
                         } else if (status == "isActive") {
                             drawRoute(coordUser, coordDistination)
-                            transaction.replace(R.id.sheet, nextFragment).commit()
+                            transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
                         } else {
 
                         }

@@ -1,6 +1,8 @@
 package com.example.taxiservice
 
+import android.app.Application
 import android.util.Log
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
@@ -16,16 +18,20 @@ import com.google.firebase.database.getValue
 import com.google.firebase.database.ktx.database
 import com.google.firebase.ktx.Firebase
 
-class InZoneViewModel : ViewModel() {
+class InZoneViewModel(application : Application, private val sharedPreference : SharedPreferenceManager): AndroidViewModel(application) {
     private var _inZone : MutableLiveData<Boolean> = MutableLiveData<Boolean>()
     var inZone : LiveData<Boolean> = _inZone
     private lateinit var geoQuery : GeoQuery
+
+    private var _fragmentVartiant : MutableLiveData<Boolean> = MutableLiveData<Boolean>(false)
+    var fragmentVariant : LiveData<Boolean> = _fragmentVartiant
+
 
     fun setupGeoQuery(uidDriver : String, positionUser: DoubleArray){
         val geoFireRef = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation")
         val geoFire = GeoFire(geoFireRef)
         val currentPosition = GeoLocation(positionUser[0],positionUser[1])
-        geoQuery= geoFire.queryAtLocation(currentPosition, 1.0)
+        geoQuery= geoFire.queryAtLocation(currentPosition, 0.2)
         geoQuery.addGeoQueryEventListener(object : GeoQueryEventListener{
             override fun onKeyEntered(key: String?, location: GeoLocation?) {
                 key?.let{
@@ -63,5 +69,23 @@ class InZoneViewModel : ViewModel() {
             }
 
         })
+    }
+    fun setupFragmnetVariant(){
+        val status = _fragmentVartiant.value ?: false
+        _fragmentVartiant.value = !status
+    }
+    fun changeOrderStatus(status : String) {
+        val currentOrder = sharedPreference.getData("currentOrderUID")
+        currentOrder?.let {
+            val dbRef =
+                Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
+                    "orders"
+                ).child(currentOrder)?.child("status")
+            dbRef?.setValue(status)
+        }
+    }
+
+    fun unistalGeoQuerry(){
+        geoQuery.removeAllListeners()
     }
 }

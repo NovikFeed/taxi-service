@@ -174,7 +174,9 @@ class RegisterActivity : AppCompatActivity() {
         android.os.Handler(Looper.getMainLooper()).postDelayed({textView.visibility = View.INVISIBLE},3000)
     }
     private fun nextActivity(){
+        val manager = SharedPreferenceManager(this)
         setActivityForIntent(userChose)
+        manager.saveData("currentUserUID", userUID)
         intent.putExtra("currentUserUID", userUID)
                 startActivity(intent)
                 finish()

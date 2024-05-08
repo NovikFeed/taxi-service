@@ -83,6 +83,7 @@ class LoginActivity : AppCompatActivity() {
         userPassword = inputPassword.text.toString()
     }
     fun loginInServer(userEmail : String, userPassword : String){
+        val manager = SharedPreferenceManager(this)
         var userChooseInFun = ""
         auth = Firebase.auth
         auth.signInWithEmailAndPassword(userEmail, userPassword).addOnCompleteListener(this) {task ->
@@ -97,6 +98,7 @@ class LoginActivity : AppCompatActivity() {
                                 userData?.let{
                                     userChooseInFun = userData.getChoose()
                                     setActivityForIntent(userChooseInFun)
+                                    manager.saveData("currentUserUID", user.uid)
                                     intent.putExtra("currentUserUID", user.uid)
                                     startActivity(intent)
                                     finish()

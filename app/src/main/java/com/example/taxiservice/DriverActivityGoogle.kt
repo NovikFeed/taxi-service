@@ -28,6 +28,8 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.get
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -94,6 +96,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var poliLine : Polyline
     private lateinit var travelTime : String
     private lateinit var currentOrderUID : String
+    private lateinit var sharedPreference : SharedPreferenceManager
     private var driverHaveOrder = false
 
 
@@ -176,6 +179,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun setView() {
+        sharedPreference = SharedPreferenceManager(this)
         buttonToWork = findViewById(R.id.buttonWork)
         callingIntent = intent
         val sheet = findViewById<FrameLayout>(R.id.sheetDriver)
@@ -326,7 +330,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
                                 setRouteToPassanger(it)
                                 nextFragment(RouteToUserFragment(), R.id.sheetDriver,currentUserUID,currentOrderUID)
                                 buttonToWork.visibility = View.INVISIBLE
-                                //openMapApp(it.passagerCoordLat, it.passagerCoordLng  )
+                                openMapApp(it.passagerCoordLat, it.passagerCoordLng  )
                             }
                             alertDialog.show()
                         }
@@ -534,12 +538,17 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         val fragmentManager = supportFragmentManager
         val transaction = fragmentManager.beginTransaction()
         val bundle = Bundle()
+        sharedPreference.saveData("currentOrderUID", orderUID)
         getPassengerCoord(orderUID) {
-            bundle.putDoubleArray("passengerCoord", it)
             bundle.putString("driverUID", driverUid)
+            bundle.putDoubleArray("passengerCoord", it)
             nextFragment.arguments = bundle
             transaction.replace(thisFragment, nextFragment).commit()
         }
+    }
+    private fun checkOrder(){
+        val userUID = sharedPreference.getData("currentUserUID")
+        
     }
 
 
