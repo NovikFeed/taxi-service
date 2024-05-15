@@ -23,6 +23,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -73,6 +74,9 @@ import com.squareup.okhttp.OkHttpClient
 import com.squareup.okhttp.Request
 import `in`.blogspot.kmvignesh.googlemapexample.GoogleMapDTO
 import `in`.blogspot.kmvignesh.googlemapexample.PolyLine
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -91,6 +95,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var currentUserInDB: DatabaseReference
     private lateinit var currentUserUID: String
     private lateinit var geoFire: GeoFire
+    private lateinit var firebaseManager : FirebaseManager
     private lateinit var dataBase : DatabaseReference
     private lateinit var dataBaseOrders : DatabaseReference
     private lateinit var poliLine : Polyline
@@ -107,6 +112,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         setContentView(binding.root)
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
         setView()
+        checkOrder()
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -193,9 +199,10 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             setGranularity(Granularity.GRANULARITY_PERMISSION_LEVEL)
             setWaitForAccurateLocation(true)
         }.build()
-
+        firebaseManager = FirebaseManager()
         currentUserUID = callingIntent.getStringExtra("currentUserUID")!!
         currentUserInDB = Firebase.database.reference.child("users").child(currentUserUID)
+        currentOrderUID = sharedPreference.getStringData("currentOrderUID")!!
         buttonToWork.setOnClickListener { toWork() }
         dataBase = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation")
         dataBaseOrders = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("orders")
@@ -326,8 +333,10 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
                             alertDialog.setMessage("$passagerAddress -> $distLocation  ${it.price}")
                             alertDialog.setCancelable(false)
                             alertDialog.setPositiveButton("Okey") { dialog, which ->
-
+                                sharedPreference.saveData("currentOrderUID", currentOrderUID)
+                                firebaseManager.setCurrentOrderUID(currentOrderUID, currentUserUID)
                                 setRouteToPassanger(it)
+                                setListenerForRoute()
                                 nextFragment(RouteToUserFragment(), R.id.sheetDriver,currentUserUID,currentOrderUID)
                                 buttonToWork.visibility = View.INVISIBLE
                                 openMapApp(it.passagerCoordLat, it.passagerCoordLng  )
@@ -346,6 +355,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         })
     }
     private fun setRouteToPassanger(order : Order){
+        mMap.clear()
         val passangerPosition = LatLng(order.passagerCoordLat, order.passagerCoordLng)
         getCurrentPosition {
             dataBaseOrders.child(currentOrderUID).child("driverCoordLat").setValue(it.latitude)
@@ -356,6 +366,18 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         }
         val marker = mMap.addMarker(MarkerOptions().position(passangerPosition))
         marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.passenger))
+    }
+    private fun setRouteWithPassanger(order : Order){
+        mMap.clear()
+        val destPosition = LatLng(order.destinationCoordLat, order.destinationCoordLng)
+        getCurrentPosition {
+            firebaseManager.setDriverCoord(currentOrderUID, it)
+            val driverPosition = it
+            val url = getDirectionURL(driverPosition, destPosition)
+            GetDirection(url).execute()
+        }
+        val marker = mMap.addMarker(MarkerOptions().position(destPosition))
+        marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.user_icon))
     }
 
     companion object {
@@ -516,6 +538,14 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         val transaction = fragmentManager.beginTransaction()
         transaction.replace(thisFragment, nextFragment).commit()
     }
+    private fun nextFragmentWithInfo(nextFragment: Fragment, thisFragment: Int){
+        val fragmentManager = supportFragmentManager
+        val transaction = fragmentManager.beginTransaction()
+        val bundle = Bundle()
+        bundle.putString("info", "i")
+        nextFragment.arguments = bundle
+        transaction.replace(thisFragment, nextFragment).commit()
+    }
     private fun getPassengerCoord(orderUID: String, callback: (DoubleArray) -> Unit){
         dataBaseOrders.child(orderUID).addListenerForSingleValueEvent(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
@@ -537,18 +567,69 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private fun nextFragment(nextFragment: Fragment, thisFragment : Int, driverUid : String, orderUID : String){
         val fragmentManager = supportFragmentManager
         val transaction = fragmentManager.beginTransaction()
-        val bundle = Bundle()
-        sharedPreference.saveData("currentOrderUID", orderUID)
         getPassengerCoord(orderUID) {
-            bundle.putString("driverUID", driverUid)
-            bundle.putDoubleArray("passengerCoord", it)
-            nextFragment.arguments = bundle
+            sharedPreference.saveData("driverUID", driverUid)
+            sharedPreference.saveData("passengerLat", it[0])
+            sharedPreference.saveData("passengerLng", it[1])
             transaction.replace(thisFragment, nextFragment).commit()
         }
     }
     private fun checkOrder(){
-        val userUID = sharedPreference.getData("currentUserUID")
-        
+        val thisFragment = R.id.sheetDriver
+        val nextFragment = RouteToUserFragment()
+        val viewModel = ViewModelProvider(this, ViewModelWithSharedPReferenceFactory(this.application, sharedPreference))[InZoneViewModel::class.java]
+        var check = false
+        val firebaseManager = FirebaseManager()
+        val userUID = sharedPreference.getStringData("currentUserUID")
+            if (userUID != null) {
+                firebaseManager.getUser(userUID!!) { user ->
+                    val orderUID = user.currentOrderUID
+                    firebaseManager.getOrder(orderUID) { order ->
+                        saveCoordUser(order)
+                        if(!check){
+                        if (order.status == "open") {
+                            startLocationUpdate()
+                            setRouteToPassanger(order)
+                            buttonToWork.visibility = View.INVISIBLE
+                            nextFragment(nextFragment, thisFragment)
+                            setListenerForRoute()
+                            check = true
+                        } else if (order.status == "Active") {
+                            startLocationUpdate()
+                            setRouteWithPassanger(order)
+                            buttonToWork.visibility = View.INVISIBLE
+                            nextFragmentWithInfo(nextFragment, thisFragment)
+                            check = true
+                        }
+                        }
+                    }
+                }
+        }
+    }
+    private fun saveCoordUser(order : Order){
+        sharedPreference.saveData("passengerLat", order.passagerCoordLat)
+        sharedPreference.saveData("passengerLng", order.passagerCoordLng)
+
+    }
+
+    private fun setListenerForRoute(){
+        val order = dataBaseOrders.child(currentOrderUID)
+        order.addValueEventListener(object : ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if(snapshot.exists()){
+                    val order = snapshot.getValue<Order>()
+                    order?.let {
+                        if(it.status == "Active"){
+                            setRouteWithPassanger(it)
+                        }
+                    }
+                }
+            }
+
+            override fun onCancelled(error: DatabaseError) {
+            }
+        })
+
     }
 
 

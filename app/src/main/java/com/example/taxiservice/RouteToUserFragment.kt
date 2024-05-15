@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +48,9 @@ import androidx.lifecycle.get
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.wear.compose.material.Text
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.IOException
 
 class RouteToUserFragment : BottomSheetDialogFragment() {
@@ -55,11 +60,12 @@ class RouteToUserFragment : BottomSheetDialogFragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        val sharedPReference = SharedPreferenceManager(requireContext())
+        val sharedPreference = SharedPreferenceManager(requireContext())
         viewModel = ViewModelProvider(this, ViewModelWithSharedPReferenceFactory(requireActivity().application,
-            sharedPReference)).get(InZoneViewModel::class.java)
-        val driverUID = arguments?.getString("driverUID")
-        val passengerCoord = arguments?.getDoubleArray("passengerCoord")
+            sharedPreference))[InZoneViewModel::class.java]
+        chekFragment()
+        val driverUID = sharedPreference.getStringData("currentUserUID")
+        val passengerCoord = doubleArrayOf(sharedPreference.getDoubleData("passengerLat"), sharedPreference.getDoubleData("passengerLng"))
         viewModel.setupGeoQuery(driverUID!!, passengerCoord!!)
         return ComposeView(requireContext()).apply {
             setContent {
@@ -67,10 +73,19 @@ class RouteToUserFragment : BottomSheetDialogFragment() {
             }
         }
     }
+    private fun chekFragment(){
+        val info = arguments?.getString("info")
+        if(info != null){
+            viewModel.setupFragmentVariant()
+        }
+    }
 }
 @Composable
 fun setView(viewModel: InZoneViewModel = viewModel()){
     val statusFragment by viewModel.fragmentVariant.observeAsState(false)
+    Log.i("coord1", statusFragment.toString())
+
+
     Column(modifier = Modifier.fillMaxSize()) {
         if(!statusFragment){
             setViewGoToPassenger()
@@ -108,7 +123,7 @@ fun setViewGoToPassenger(viewModel: InZoneViewModel = viewModel()){
                             Button(onClick = {
                                 viewModel.unistalGeoQuerry()
                                 viewModel.changeOrderStatus( "Active")
-                                viewModel.setupFragmnetVariant()
+                                viewModel.setupFragmentVariant()
                                              },
                                 modifier = Modifier
                                     .fillMaxHeight(0.28f)
@@ -131,5 +146,7 @@ fun setViewGoToPassenger(viewModel: InZoneViewModel = viewModel()){
 }
  @Composable
 fun setViewGoWithPassenger(){
+    Column(modifier = Modifier.fillMaxSize(1f).background(Color.Red)) {
 
+    }
 }

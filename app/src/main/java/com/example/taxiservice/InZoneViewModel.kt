@@ -23,8 +23,8 @@ class InZoneViewModel(application : Application, private val sharedPreference : 
     var inZone : LiveData<Boolean> = _inZone
     private lateinit var geoQuery : GeoQuery
 
-    private var _fragmentVartiant : MutableLiveData<Boolean> = MutableLiveData<Boolean>(false)
-    var fragmentVariant : LiveData<Boolean> = _fragmentVartiant
+    private var _fragmentVariant : MutableLiveData<Boolean> = MutableLiveData<Boolean>()
+    var fragmentVariant : LiveData<Boolean> = _fragmentVariant
 
 
     fun setupGeoQuery(uidDriver : String, positionUser: DoubleArray){
@@ -61,7 +61,6 @@ class InZoneViewModel(application : Application, private val sharedPreference : 
             }
 
             override fun onGeoQueryReady() {
-                Log.d("COORD", "REady")
             }
 
             override fun onGeoQueryError(error: DatabaseError?) {
@@ -70,12 +69,12 @@ class InZoneViewModel(application : Application, private val sharedPreference : 
 
         })
     }
-    fun setupFragmnetVariant(){
-        val status = _fragmentVartiant.value ?: false
-        _fragmentVartiant.value = !status
+    fun setupFragmentVariant(){
+        val status = _fragmentVariant.value ?: false
+        _fragmentVariant.value = !status
     }
     fun changeOrderStatus(status : String) {
-        val currentOrder = sharedPreference.getData("currentOrderUID")
+        val currentOrder = sharedPreference.getStringData("currentOrderUID")
         currentOrder?.let {
             val dbRef =
                 Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
