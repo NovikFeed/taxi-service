@@ -30,4 +30,5 @@ class TaxiRepository {
         })
         return liveData
     }
+
 }

@@ -114,12 +114,13 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var dataBase: DatabaseReference
     private lateinit var dataBaseOrders : DatabaseReference
     private lateinit var geoFire : GeoFire
-    //private lateinit var myChildEvenListener: ChildEventListener
     private lateinit var distanceBetweenPoints: String
+    private lateinit var sharedPreference : SharedPreferenceManager
     private lateinit var cardView : CardView
     private lateinit var userPositionForMakeOrder : LatLng
     private lateinit var userDestinationPositionForMakeOrder : LatLng
     private lateinit var orderUID : String
+    private lateinit var driverUID : String
     private lateinit var geoQuery : GeoQuery
     private lateinit var geoQueryForDriverIcon: GeoQuery
     private lateinit var currentUserUID : String
@@ -166,11 +167,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         buttonSetRoute.setOnClickListener { setRoute() }
         buttonMakeAnOrder.setOnClickListener { makeAnOrder() }
         deleteOrderAfterCancel()
-        checkActiveOrder()
-    }
-
-    override fun onStop() {
-        super.onStop()
+       // checkActiveOrder()
     }
 
     override fun onMapReady(googleMap: GoogleMap) {
@@ -203,7 +200,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
                 "users"
             )
         geoFire = GeoFire(Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation"))
-
+        sharedPreference = SharedPreferenceManager(this)
         cardView = findViewById(R.id.searchView)
         buttonMakeAnOrder = findViewById(R.id.startOrder)
         priceText = findViewById(R.id.priceText)
@@ -365,7 +362,9 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
                     driverWasFound = true
                     dataBaseOrders.child(orderUID).child("driver").setValue(key)
                     checkListenerOnGeoQuery = false
+                    setInfoAboutApp(orderUID, key!!)
                     setRouteDriverToUser()
+                    setDriverFragment()
                     geoQuery.removeAllListeners()
 
                 }
@@ -411,6 +410,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         val nextFragment = DriverIsFound()
         val transaction = fragmentManager.beginTransaction()
         val bundle = Bundle()
+        cardView.visibility = View.INVISIBLE
         bundle.putString("currentOrder", orderUID)
         nextFragment.arguments = bundle
         transaction.replace(R.id.sheet, nextFragment).commit()
@@ -429,9 +429,6 @@ private fun restartActivity(){
             if (address.getAddressLine(0) != null) {
                 autoChooseAddress.setText(address.getAddressLine(0))
             }
-//            if(address.getAddressLine(1) != null){
-//                autoChooseAddress.text.toString() + address.getAddressLine(1)
-//                 }
         }
     }
 
@@ -764,7 +761,7 @@ private fun restartActivity(){
                                     val currentOrder = snapshot.getValue<Order>()
                                     currentOrder?.let {
                                         check = currentOrder.status
-                                        if(check == "open" || check == "isActive"){
+                                        if(check == "open" || check == "Active"){
                                             buttonMakeAnOrder.visibility = View.INVISIBLE
                                             cardView.visibility = View.INVISIBLE
                                             orderUID = currentOrderUID
@@ -815,7 +812,9 @@ private fun restartActivity(){
                             val marker = mMap.addMarker(MarkerOptions().position(coordDriver))
                             marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
                             transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
-                        } else if (status == "isActive") {
+                        } else if (status == "Active") {
+                            bundle.putString("info", "i")
+                            nextFragment.arguments = bundle
                             drawRoute(coordUser, coordDistination)
                             transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
                         } else {
@@ -847,7 +846,6 @@ private fun restartActivity(){
                                     userPositionForMakeOrder
                                 )
                                 dataBaseOrders.removeEventListener(this)
-                                setDriverFragment()
                             }
                         }
                     }
@@ -865,7 +863,14 @@ private fun restartActivity(){
 
         })
     }
-    
+
+    private fun setInfoAboutApp(orderUID: String, driverUID: String){
+        sharedPreference.saveData("orderUID", orderUID)
+        sharedPreference.saveData("driverUID", driverUID)
+        Log.i("coord1", sharedPreference.getStringData("driverUID")!!)
+        Log.i("coord1", sharedPreference.getStringData("orderUID")!!)
+
+    }
 
 }
 

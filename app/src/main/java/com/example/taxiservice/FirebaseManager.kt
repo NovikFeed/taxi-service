@@ -49,7 +49,22 @@ class FirebaseManager {
     fun setDriverCoord(orderUID : String, coord: LatLng){
         ordersReference.child(orderUID).child("driverCoordLat").setValue(coord.latitude)
         ordersReference.child(orderUID).child("driverCoordLng").setValue(coord.longitude)
+    }
+    fun getPhoneNumber(driverUID: String, callback: (String) -> Unit){
+        usersReference.child(driverUID).addValueEventListener(object : ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if(snapshot.exists()){
+                    val data = snapshot.getValue<User>()
+                    data?.let{
+                        callback(it.getPhone())
+                    }
 
+                }
+            }
 
+            override fun onCancelled(error: DatabaseError) {
+            }
+
+        })
     }
 }
