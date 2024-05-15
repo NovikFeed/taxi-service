@@ -120,10 +120,10 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
     private lateinit var userPositionForMakeOrder : LatLng
     private lateinit var userDestinationPositionForMakeOrder : LatLng
     private lateinit var orderUID : String
-    private lateinit var driverUID : String
     private lateinit var geoQuery : GeoQuery
     private lateinit var geoQueryForDriverIcon: GeoQuery
     private lateinit var currentUserUID : String
+    private lateinit var firebaseManager : FirebaseManager
     private lateinit var fragmentManager : FragmentManager
     private var isCameraTrakingEnable: Boolean = false
     private var chooseAddressWithPin: LatLng = LatLng(0.0, 0.0)
@@ -142,8 +142,8 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         binding = ActivityPassagerGoogleBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setView()
+        checkActiveOrder()
         autoComplete()
-
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
@@ -199,6 +199,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
             Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child(
                 "users"
             )
+        firebaseManager = FirebaseManager()
         geoFire = GeoFire(Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation"))
         sharedPreference = SharedPreferenceManager(this)
         cardView = findViewById(R.id.searchView)
@@ -339,6 +340,7 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         val bundle = Bundle()
         orderUID = makeUidForOrder()
         val order = Order("open",userPositionForMakeOrder.latitude, userPositionForMakeOrder.longitude,0.0,0.0,userDestinationPositionForMakeOrder.latitude, userDestinationPositionForMakeOrder.longitude, priceText.text.toString())
+        sharedPreference.saveData("orderUID", orderUID)
         dataBaseOrders.child(orderUID).setValue(order)
         dataBase.child(currentUserUID!!).child("currentOrderUID").setValue(orderUID)
         radius = 1.0
@@ -744,90 +746,49 @@ private fun restartActivity(){
         val callIntent = intent
         return callIntent.getStringExtra("currentUserUID")
     }
+
     private fun checkActiveOrder(){
-        var check : String = ""
-        var currentOrderUID : String
-        val userUID = getCurrentUserUid()!!
-        dataBase.child(userUID).addValueEventListener(object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if(snapshot.exists()){
-                    val userInfo = snapshot.getValue<User>()
-                    userInfo?.let {
-                       currentOrderUID = userInfo.currentOrderUID
-
-                        dataBaseOrders.child(currentOrderUID).addValueEventListener(object : ValueEventListener{
-                            override fun onDataChange(snapshot: DataSnapshot) {
-                                if(snapshot.exists()){
-                                    val currentOrder = snapshot.getValue<Order>()
-                                    currentOrder?.let {
-                                        check = currentOrder.status
-                                        if(check == "open" || check == "Active"){
-                                            buttonMakeAnOrder.visibility = View.INVISIBLE
-                                            cardView.visibility = View.INVISIBLE
-                                            orderUID = currentOrderUID
-                                            geoQueryForDriverIcon.removeAllListeners()
-                                            drawRouteAfterResume(check)
-                                        }
-                                    }
-                                }
-                            }
-
-                            override fun onCancelled(error: DatabaseError) {
-                            }
-
-
-                        })
-                    }
-                }
+        orderUID = sharedPreference.getStringData("orderUID")!!
+        firebaseManager.getOrder(orderUID){order ->
+            if(order.status != "complete"){
+                buttonMakeAnOrder.visibility = View.INVISIBLE
+                cardView.visibility = View.INVISIBLE
+                drawRouteAfterResume(order.status)
             }
-
-            override fun onCancelled(error: DatabaseError) {
-            }
-
-        })
+        }
     }
     private fun drawRouteAfterResume(status : String){
         var coordDriver : LatLng = LatLng(0.0,0.0)
         var coordDistination : LatLng = LatLng(0.0,0.0)
         var coordUser : LatLng =  LatLng(0.0,0.0)
-        dataBaseOrders.child(orderUID).addValueEventListener(object : ValueEventListener{
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if(snapshot.exists()){
-                    val orderInfo = snapshot.getValue<Order>()
-                    orderInfo?.let {
-                        fragmentManager = supportFragmentManager
-                        val nextFragment = DriverIsFound()
-                        val transaction = fragmentManager.beginTransaction()
-                        val bundle = Bundle()
-                        bundle.putString("currentOrder",orderUID)
-                        nextFragment.arguments = bundle
-                        coordDriver = LatLng(orderInfo.driverCoordLat, orderInfo.driverCoordLng)
-                        coordDistination =
-                            LatLng(orderInfo.destinationCoordLat, orderInfo.destinationCoordLng)
-                        coordUser = LatLng(orderInfo.passagerCoordLat, orderInfo.passagerCoordLng)
-                        mMap.clear()
-                        buttonSetRoute.visibility = View.INVISIBLE
-                        if (status == "open") {
-                            drawRoute(coordDriver, coordUser)
-                            val marker = mMap.addMarker(MarkerOptions().position(coordDriver))
-                            marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
-                            transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
-                        } else if (status == "Active") {
-                            bundle.putString("info", "i")
-                            nextFragment.arguments = bundle
-                            drawRoute(coordUser, coordDistination)
-                            transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
-                        } else {
-
-                        }
-                    }
+        firebaseManager.getOrder(orderUID){order ->
+            order?.let{
+                fragmentManager = supportFragmentManager
+                val nextFragment = DriverIsFound()
+                val transaction = fragmentManager.beginTransaction()
+                val bundle = Bundle()
+                bundle.putString("currentOrder",orderUID)
+                nextFragment.arguments = bundle
+                coordDriver = LatLng(order.driverCoordLat, order.driverCoordLng)
+                coordDistination =
+                    LatLng(order.destinationCoordLat, order.destinationCoordLng)
+                coordUser = LatLng(order.passagerCoordLat, order.passagerCoordLng)
+                mMap.clear()
+                buttonSetRoute.visibility = View.INVISIBLE
+                if (status == "open") {
+                    val marker = mMap.addMarker(MarkerOptions().position(coordDriver))
+                    marker?.setIcon(BitmapDescriptorFactory.fromResource(R.drawable.dri))
+                    transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
+                } else if (status == "Active") {
+                    nextFragment.arguments = bundle
+                    drawRoute(coordUser, coordDistination)
+                    transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
+                } else {
 
                 }
             }
 
-            override fun onCancelled(error: DatabaseError) {
-            }
-        })
+        }
     }
     private fun setRouteDriverToUser(){
         dataBaseOrders.addChildEventListener(object : ChildEventListener{
