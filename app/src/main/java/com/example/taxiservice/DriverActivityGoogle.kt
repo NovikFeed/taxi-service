@@ -25,10 +25,12 @@ import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.get
 
@@ -101,9 +103,10 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var poliLine : Polyline
     private lateinit var travelTime : String
     private lateinit var currentOrderUID : String
+    private lateinit var repository : TaxiRepository
     private lateinit var sharedPreference : SharedPreferenceManager
     private var driverHaveOrder = false
-
+    private lateinit var viewModel : InZoneViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,6 +116,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         fusedLocation = LocationServices.getFusedLocationProviderClient(this)
         setView()
         checkOrder()
+
 
         val mapFragment = supportFragmentManager
             .findFragmentById(R.id.map) as SupportMapFragment
@@ -185,8 +189,10 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun setView() {
+        repository = TaxiRepository()
         sharedPreference = SharedPreferenceManager(this)
         buttonToWork = findViewById(R.id.buttonWork)
+        viewModel = ViewModelProvider(this, ViewModelWithSharedPReferenceFactory(application, sharedPreference, repository))[InZoneViewModel::class.java]
         callingIntent = intent
         val sheet = findViewById<FrameLayout>(R.id.sheetDriver)
         bottomSheet = BottomSheetBehavior.from(sheet)
@@ -536,7 +542,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
     private fun nextFragment(nextFragment: Fragment, thisFragment : Int){
         val fragmentManager = supportFragmentManager
         val transaction = fragmentManager.beginTransaction()
-        transaction.replace(thisFragment, nextFragment).commit()
+        transaction.replace(thisFragment, nextFragment).commitAllowingStateLoss()
     }
     private fun nextFragmentWithInfo(nextFragment: Fragment, thisFragment: Int){
         val fragmentManager = supportFragmentManager
@@ -544,7 +550,7 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         val bundle = Bundle()
         bundle.putString("info", "i")
         nextFragment.arguments = bundle
-        transaction.replace(thisFragment, nextFragment).commit()
+        transaction.replace(thisFragment, nextFragment).commitAllowingStateLoss()
     }
     private fun getPassengerCoord(orderUID: String, callback: (DoubleArray) -> Unit){
         dataBaseOrders.child(orderUID).addListenerForSingleValueEvent(object : ValueEventListener {
@@ -571,13 +577,12 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             sharedPreference.saveData("driverUID", driverUid)
             sharedPreference.saveData("passengerLat", it[0])
             sharedPreference.saveData("passengerLng", it[1])
-            transaction.replace(thisFragment, nextFragment).commit()
+            transaction.replace(thisFragment, nextFragment).commitAllowingStateLoss()
         }
     }
     private fun checkOrder(){
         val thisFragment = R.id.sheetDriver
         val nextFragment = RouteToUserFragment()
-        val viewModel = ViewModelProvider(this, ViewModelWithSharedPReferenceFactory(this.application, sharedPreference))[InZoneViewModel::class.java]
         var check = false
         val firebaseManager = FirebaseManager()
         val userUID = sharedPreference.getStringData("currentUserUID")
@@ -587,18 +592,17 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
                     firebaseManager.getOrder(orderUID) { order ->
                         saveCoordUser(order)
                         if(!check){
-                        if (order.status == "open") {
+                        if (order.status != "done") {
                             startLocationUpdate()
-                            setRouteToPassanger(order)
+                            if(order.status == "open"){
+                                setRouteToPassanger(order)
+                            }
+                            else if(order.status == "Active"){
+                                setRouteWithPassanger(order)
+                            }
                             buttonToWork.visibility = View.INVISIBLE
                             nextFragment(nextFragment, thisFragment)
                             setListenerForRoute()
-                            check = true
-                        } else if (order.status == "Active") {
-                            startLocationUpdate()
-                            setRouteWithPassanger(order)
-                            buttonToWork.visibility = View.INVISIBLE
-                            nextFragmentWithInfo(nextFragment, thisFragment)
                             check = true
                         }
                         }
@@ -631,6 +635,5 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         })
 
     }
-
 
 }

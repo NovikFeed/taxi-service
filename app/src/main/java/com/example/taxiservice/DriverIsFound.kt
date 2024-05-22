@@ -79,7 +79,6 @@ class DriverIsFound : BottomSheetDialogFragment() {
     ): View? {
         sharedPreference = SharedPreferenceManager(requireContext())
         viewModel.setPhoneNumber(sharedPreference.getStringData("driverUID")!!)
-//        checkVariantFragment()
         return ComposeView(requireContext()).apply {
             val uid = arguments?.getString("currentOrder")
             setContent {
@@ -87,16 +86,6 @@ class DriverIsFound : BottomSheetDialogFragment() {
             }
         }
     }
-//    private fun checkVariantFragment(){
-//        val info = arguments?.getString("info")
-//        Log.i("coord", info.toString())
-//        if(info != null){
-//            viewModel.setFragmentWithPassenger()
-//        }
-//        else{
-//            viewModel.setFragmentToPassenger()
-//        }
-//    }
 }
 
 @Composable
