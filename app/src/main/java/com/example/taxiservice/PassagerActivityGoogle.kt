@@ -3,6 +3,7 @@ package com.example.taxiservice
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -36,6 +37,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentManager
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -750,7 +752,7 @@ private fun restartActivity(){
     private fun checkActiveOrder(){
         orderUID = sharedPreference.getStringData("orderUID")!!
         firebaseManager.getOrder(orderUID){order ->
-            if(order.status != "complete"){
+            if(order.status != "done"){
                 buttonMakeAnOrder.visibility = View.INVISIBLE
                 cardView.visibility = View.INVISIBLE
                 drawRouteAfterResume(order.status)
@@ -784,7 +786,7 @@ private fun restartActivity(){
                     drawRoute(coordUser, coordDistination)
                     transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
                 } else {
-
+                    transaction.replace(R.id.sheet, nextFragment).commitAllowingStateLoss()
                 }
             }
 

@@ -10,9 +10,8 @@ import androidx.lifecycle.ViewModel
 import com.google.api.Context
 
 class DriverIsFoundViewModel(private val repository : TaxiRepository) : ViewModel() {
-
-    private var _fragmentVariant : MutableLiveData<String> = MutableLiveData<String>()
-    var fragmentVariant : LiveData<String> = _fragmentVariant
+    private var _costOfTrip : MutableLiveData<String> = MutableLiveData()
+    var costOfTrip : LiveData<String> = _costOfTrip
 
     private var _phoneNumberDriver : MutableLiveData<String> = MutableLiveData<String>()
     var phoneNumberDriver : LiveData<String> = _phoneNumberDriver
@@ -31,6 +30,17 @@ class DriverIsFoundViewModel(private val repository : TaxiRepository) : ViewMode
     fun callDriver(context: android.content.Context, phone: String){
         val intent = Intent(Intent.ACTION_DIAL)
         intent.data = Uri.parse("tel:$phone")
+        context.startActivity(intent)
+    }
+     fun setPrice(order: Order){
+        _costOfTrip.value = order.price
+    }
+    fun restartApplication(context: android.content.Context) {
+        val packageName = context.packageName
+        val packageManager = context.packageManager
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+        intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }
 }

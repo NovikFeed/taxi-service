@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -92,6 +93,7 @@ class DriverIsFound : BottomSheetDialogFragment() {
 fun setCustomContent(viewModel: DriverIsFoundViewModel, uid: String, context: Context){
     val status by viewModel.getOrder(uid).observeAsState()
     status?.let{order ->
+        viewModel.setPrice(order)
         Surface(modifier = Modifier
             .fillMaxSize()
             .height(100.dp)
@@ -111,11 +113,19 @@ fun setCustomContent(viewModel: DriverIsFoundViewModel, uid: String, context: Co
                             cap = StrokeCap.Round
                         )
                     })
-
-                    if (order.status== "open") {
-                        setInfo(uid, viewModel)
-                    } else if (order.status == "Active") {
-                        setViewWithDriver(viewModel, context)
+                    when(order.status){
+                        "open" -> {
+                            setInfo(uid, viewModel)
+                        }
+                        "Active" -> {
+                            setViewWithDriver(viewModel, context)
+                        }
+                        "close" -> {
+                            setViewFinishTrip(viewModel, context )
+                        }
+                        "done" -> {
+                            viewModel.restartApplication(context)
+                        }
                     }
                 }
             })
@@ -239,6 +249,28 @@ private fun setViewWithDriver(viewModel: DriverIsFoundViewModel, context : Conte
             .padding(10.dp),
             shape = RectangleShape) {
             Text(text = "Call driver", style = myTextStyle)
+        }
+    }
+}
+@Composable
+private fun setViewFinishTrip(viewModel : DriverIsFoundViewModel, context: Context){
+    val price by viewModel.costOfTrip.observeAsState()
+    val myTextStyle = TextStyle(
+        fontSize = 20.sp,
+        fontFamily = FontFamily.Monospace,
+        color =  Color.Black,
+        fontWeight = FontWeight.Bold
+    )
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(0.dp, 30.dp), horizontalAlignment = Alignment.CenterHorizontally){
+        Text(text = "Your trip finished", style =myTextStyle)
+        Text(text = price!!, style = myTextStyle)
+        Button(onClick = {viewModel.restartApplication(context) }, modifier = Modifier
+            .fillMaxHeight(0.32f)
+            .fillMaxWidth()
+            .padding(10.dp), shape = RectangleShape) {
+            Text(text = "Ok", style = myTextStyle)
         }
     }
 }
