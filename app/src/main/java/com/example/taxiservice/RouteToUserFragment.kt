@@ -233,6 +233,7 @@ fun setViewFinish(viewModel: InZoneViewModel = viewModel(), context: Context){
                 Text(text = cost!!, style = style, textAlign = TextAlign.Center)
                 Button(onClick = {
                                  viewModel.changeOrderStatus("done")
+                                viewModel.setOrder()
                                 viewModel.restartApplication(context)
                 }, modifier = Modifier
                     .fillMaxWidth()

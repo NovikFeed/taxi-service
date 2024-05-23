@@ -363,13 +363,17 @@ open class PassagerActivityGoogle : AppCompatActivity(), OnMapReadyCallback,Loca
         geoQuery.addGeoQueryEventListener(object  : GeoQueryEventListener{
             override fun onKeyEntered(key: String?, location: GeoLocation?) {
                 if(!driverWasFound) {
-                    driverWasFound = true
-                    dataBaseOrders.child(orderUID).child("driver").setValue(key)
-                    checkListenerOnGeoQuery = false
-                    setInfoAboutApp(orderUID, key!!)
-                    setRouteDriverToUser()
-                    setDriverFragment()
-                    geoQuery.removeAllListeners()
+                    checkDriverFree(key!!){
+                        if(it){
+                            driverWasFound = true
+                            dataBaseOrders.child(orderUID).child("driver").setValue(key)
+                            checkListenerOnGeoQuery = false
+                            setInfoAboutApp(orderUID, key!!)
+                            setRouteDriverToUser()
+                            setDriverFragment()
+                            geoQuery.removeAllListeners()
+                        }
+                    }
 
                 }
 
@@ -757,6 +761,9 @@ private fun restartActivity(){
                 cardView.visibility = View.INVISIBLE
                 drawRouteAfterResume(order.status)
             }
+            else{
+
+            }
         }
     }
     private fun drawRouteAfterResume(status : String){
@@ -833,6 +840,16 @@ private fun restartActivity(){
         Log.i("coord1", sharedPreference.getStringData("driverUID")!!)
         Log.i("coord1", sharedPreference.getStringData("orderUID")!!)
 
+    }
+    private fun checkDriverFree(driverUID: String, callback: (Boolean) -> Unit){
+        firebaseManager.getUser(driverUID){
+            if(it.currentOrderUID == ""){
+                callback(true)
+            }
+            else{
+                callback(false)
+            }
+        }
     }
 
 }

@@ -117,5 +117,10 @@ class InZoneViewModel(application : Application, private val sharedPreference : 
         intent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
     }
+    fun setOrder(){
+        val user = sharedPreference.getStringData("currentUserUID")
+        Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference
+            .child("users").child(user!!).child("currentOrderUID").setValue("")
+    }
 
 }

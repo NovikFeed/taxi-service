@@ -589,22 +589,23 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
             if (userUID != null) {
                 firebaseManager.getUser(userUID!!) { user ->
                     val orderUID = user.currentOrderUID
-                    firebaseManager.getOrder(orderUID) { order ->
-                        saveCoordUser(order)
-                        if(!check){
-                        if (order.status != "done") {
-                            startLocationUpdate()
-                            if(order.status == "open"){
-                                setRouteToPassanger(order)
+                    if(orderUID != "") {
+                        firebaseManager.getOrder(orderUID) { order ->
+                            saveCoordUser(order)
+                            if (!check) {
+                                if (order.status != "done") {
+                                    startLocationUpdate()
+                                    if (order.status == "open") {
+                                        setRouteToPassanger(order)
+                                    } else if (order.status == "Active") {
+                                        setRouteWithPassanger(order)
+                                    }
+                                    buttonToWork.visibility = View.INVISIBLE
+                                    nextFragment(nextFragment, thisFragment)
+                                    setListenerForRoute()
+                                    check = true
+                                }
                             }
-                            else if(order.status == "Active"){
-                                setRouteWithPassanger(order)
-                            }
-                            buttonToWork.visibility = View.INVISIBLE
-                            nextFragment(nextFragment, thisFragment)
-                            setListenerForRoute()
-                            check = true
-                        }
                         }
                     }
                 }
