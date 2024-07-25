@@ -208,7 +208,9 @@ class DriverActivityGoogle : AppCompatActivity(), OnMapReadyCallback {
         firebaseManager = FirebaseManager()
         currentUserUID = callingIntent.getStringExtra("currentUserUID")!!
         currentUserInDB = Firebase.database.reference.child("users").child(currentUserUID)
-        currentOrderUID = sharedPreference.getStringData("currentOrderUID")!!
+        sharedPreference.getStringData("currentOrderUID")?.let {
+            currentOrderUID = it
+        }
         buttonToWork.setOnClickListener { toWork() }
         dataBase = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("driversLocation")
         dataBaseOrders = Firebase.database("https://taxiservice-ef804-default-rtdb.europe-west1.firebasedatabase.app/").reference.child("orders")

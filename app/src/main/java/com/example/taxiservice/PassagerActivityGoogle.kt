@@ -754,14 +754,17 @@ private fun restartActivity(){
     }
 
     private fun checkActiveOrder(){
-        orderUID = sharedPreference.getStringData("orderUID")!!
-        firebaseManager.getOrder(orderUID){order ->
-            if(order.status != "done"){
-                buttonMakeAnOrder.visibility = View.INVISIBLE
-                cardView.visibility = View.INVISIBLE
-                drawRouteAfterResume(order.status)
-            }
-            else{
+        val tmpUID = sharedPreference.getStringData("orderUID")
+        tmpUID?.let {
+            orderUID = it
+                firebaseManager.getOrder(orderUID) { order ->
+                    if (order.status != "done") {
+                        buttonMakeAnOrder.visibility = View.INVISIBLE
+                        cardView.visibility = View.INVISIBLE
+                        drawRouteAfterResume(order.status)
+                    } else {
+
+                    }
 
             }
         }
