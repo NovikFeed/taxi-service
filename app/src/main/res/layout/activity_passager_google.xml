@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:map="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_height="match_parent"
+    android:layout_width="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <fragment
+        android:id="@+id/map"
+        android:name="com.google.android.gms.maps.SupportMapFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        map:layout_constraintEnd_toEndOf="parent"
+        map:layout_constraintStart_toStartOf="parent"
+        map:layout_constraintTop_toTopOf="parent"
+        tools:context=".PassagerActivityGoogle" />
+
+    <FrameLayout
+        android:id="@+id/sheet"
+        android:layout_width="match_parent"
+        android:layout_height="400dp"
+        android:background="@drawable/shape"
+        app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+        map:layout_constraintBottom_toBottomOf="parent"
+        map:layout_constraintEnd_toEndOf="parent"
+        map:layout_constraintStart_toStartOf="parent">
+
+
+        <ImageView
+            android:id="@+id/imageView3"
+            android:layout_width="174dp"
+            android:layout_height="44dp"
+            android:layout_gravity="center|top"
+            android:scaleType="center"
+            map:srcCompat="@android:drawable/button_onoff_indicator_off" />
+
+        <TextView
+            android:id="@+id/textView16"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center|top"
+            android:layout_marginTop="20dp"
+            android:fontFamily="monospace"
+            android:text="@string/titleBottomSheet"
+            android:textColor="@color/black"
+            android:textSize="30sp"
+            map:layout_anchor="@+id/sheet"
+            map:layout_anchorGravity="center" />
+
+        <androidx.cardview.widget.CardView
+            android:id="@+id/searchView"
+            android:layout_width="250dp"
+            android:layout_marginTop="120dp"
+            android:layout_height="62dp"
+            android:visibility="visible"
+            android:layout_marginLeft="20dp"
+            android:background="@color/black">
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/fragmentAutocomplete"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:name="com.google.android.libraries.places.widget.AutocompleteSupportFragment"
+                />
+        </androidx.cardview.widget.CardView>
+
+
+        <ImageButton
+            android:id="@+id/enableListner"
+            android:layout_width="62dp"
+            android:layout_height="62dp"
+            android:layout_gravity="end"
+            android:layout_marginTop="120dp"
+            android:layout_marginRight="34dp"
+            map:srcCompat="@drawable/pin"
+            android:background="@color/empty"/>
+
+        <Button
+            android:id="@+id/buttonSetRout"
+            android:layout_width="350dp"
+            android:layout_height="62dp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="200dp"
+            android:layout_marginRight="34dp"
+            android:background="@color/purple"
+            android:text="@string/butSetRoute"
+            android:visibility="visible"
+            android:textColor="@color/white"
+            android:textFontWeight="600"
+            android:textSize="25sp" />
+
+        <TextView
+            android:id="@+id/autoChooseAddress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:visibility="invisible"
+            android:fontFamily="monospace"
+            android:textSize="16sp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="80dp"/>
+
+        <TextView
+            android:id="@+id/priceText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="200dp"
+            android:layout_marginLeft="20dp"
+            android:fontFamily="monospace"
+            android:textSize="24sp"
+            android:textFontWeight="600"
+            android:visibility="visible"
+            android:text=""
+            android:textColor="@color/black"
+            />
+
+        <Button
+            android:id="@+id/startOrder"
+            android:layout_width="350dp"
+            android:layout_height="62dp"
+            android:layout_marginLeft="20dp"
+            android:layout_marginTop="270dp"
+            android:layout_marginRight="34dp"
+            android:background="@color/purple"
+            android:text="@string/butMakeAnOrder"
+            android:textColor="@color/white"
+            android:textFontWeight="600"
+            android:textSize="25sp"
+            android:visibility="gone" />
+
+
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/pin"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_gravity="center"
+        android:visibility="invisible"
+        android:src="@drawable/user_icon" />
+
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
